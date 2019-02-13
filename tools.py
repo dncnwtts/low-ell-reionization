@@ -25,6 +25,21 @@ cls = cosmo.lensed_cl(2500)
 cosmo.struct_cleanup()
 cosmo.empty()
 
+def get_all(tau, lmax=100, rescale=True):
+    params['tau_reio'] = tau
+    if rescale:
+        amp = 2.3e-9*np.exp(-2*0.06)
+        As = amp/np.exp(-2*tau)
+        #As = 2.3e-9
+        params['A_s' ] = As
+
+    cosmo.set(params)
+    cosmo.compute()
+    powers = cosmo.lensed_cl(lmax=lmax)
+    Z = np.ones_like(powers['ell'])*(cosmo.T_cmb()*1e6)**2
+    return powers['tt'][:lmax+1]*Z[:lmax+1], powers['te'][:lmax+1]*Z[:lmax+1], powers['ee'][:lmax+1]*Z[:lmax+1]
+
+
 def get_TE(tau, lmax=100, rescale=True):
     params['tau_reio'] = tau
     if rescale:
