@@ -7,6 +7,11 @@ from scipy.integrate import trapz
 import scipy.optimize as op
 import emcee
 from time import time
+
+import sys
+from schwimmbad import MPIPool
+
+
 lmax = 100
 params = {
     'output': 'tCl pCl lCl',
@@ -18,6 +23,17 @@ params['reio_parametrization'] ='reio_many_tanh'
 params['many_tanh_num'] = 3
 params['many_tanh_width'] = 0.5
 cosmo = Class()
+
+def lnprob(args, Clhat):
+    zre, x_e = args
+    if (zre < 4) | (x_e < 0) | (x_e > 0.5):
+        return -np.inf
+    return sum(lnprob_EE_ell(zre, x_e, Clhat)[2:])
+
+def lnprob_EE_ell(zre, x_e, Clhat):
+    ell, Cl, TE = get_spectra(zre, x_e, lmax=len(Clhat)-1, spectra=True)
+    chi2_ell = (2*ell+1)*(Clhat/Cl + np.log(Cl/Clhat)-1)
+    return -chi2_ell#-chi2_exp_ell
 
 def get_tau(thermo, zmax=100, xmin=2e-4):
     eta = thermo['conf. time [Mpc]']
@@ -47,108 +63,82 @@ def get_spectra(zreio, x_e, history=False, spectra=False, both=False, lmax=40, t
     params['many_tanh_xe'] = '-2,-1,'+str(max(x_e, 2e-4))
     cosmo.set(params)
     cosmo.compute()
+    thermo = cosmo.get_thermodynamics()
+    tau = get_tau(thermo)
+    params['A_s'] = 2.3e-9*np.exp(-2*0.06)/np.exp(-2*tau)
+    cosmo.set(params)
+    cosmo.compute()
+
+    thermo = cosmo.get_thermodynamics()
+    cls = cosmo.lensed_cl(lmax)
+    cosmo.struct_cleanup()
     if both:
-        thermo = cosmo.get_thermodynamics()
         z, xe = thermo['z'], thermo['x_e']
         cls = cosmo.lensed_cl(lmax)
         ell, EE, TE = cls['ell'], cls['ee'], cls['te']
         return z, xe, ell, EE, TE
     elif therm:
-        return cosmo.get_thermodynamics()
+        return thermo
     elif spectra:
-        cls = cosmo.lensed_cl(lmax)
         ell, EE, TE = cls['ell'], cls['ee'], cls['te']
         return ell, EE, TE
     elif history:
-        thermo = cosmo.get_thermodynamics()
         z, xe = thermo['z'], thermo['x_e']
         return z, xe
     else:
         return
 
 if __name__ == '__main__':
-    seed = 0
 
-    # Define your cosmology (what is not specified will be set to CLASS default parameters)
-    
+    pool = MPIPool()
+    if not pool.is_master():
+        pool.wait()
+        sys.exit()
+    seed = 2
+
     params['many_tanh_z'] = '3.5,7,28'
     params['many_tanh_xe'] = '-2,-1,0.2'
     
     
     
     
-    ell, ee, te = get_spectra(7, 0.2, spectra=True, lmax=lmax)
-    plt.loglog(ell, ee)
+    ell, ee, te = get_spectra(6, 0.05, spectra=True, lmax=lmax)
     np.random.seed(seed)
     eehat = hp.alm2cl(hp.synalm(ee, lmax=lmax))
-    plt.loglog(ell, eehat)
-    
-    def lnprob_EE_ell(zre, x_e, Clhat):
-        ell, Cl, TE = get_spectra(zre, x_e, lmax=len(Clhat)-1, spectra=True)
-        chi2_ell = (2*ell+1)*(Clhat/Cl + np.log(Cl/Clhat)-1)
-        return -chi2_ell#-chi2_exp_ell
-    
-    chi2_ell = lnprob_EE_ell(7, 0.2, eehat)
-    plt.plot(ell[2:], chi2_ell[2:])
-    
-    def lnprob(args, Clhat):
-        zre, x_e = args
-        if (zre < 4) | (x_e < 0) | (x_e > 0.5):
-            return -np.inf
-        return sum(lnprob_EE_ell(zre, x_e, Clhat)[2:])
-    
-    print(sum(chi2_ell[2:]), lnprob(np.array([7, 0.2]), eehat))
     
     
-    nll = lambda *args: -lnprob(*args)
-    result = op.minimize(nll, [7, 0.2], args=(eehat))
-    print(result)
-    
-    ndim, nwalkers = 2, 6
-    pos = [result['x'] + 1e-4*np.random.randn(ndim) for i in range(nwalkers)]
+    chi2_ell = lnprob_EE_ell(6, 0.05, eehat)
     
     
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=([eehat]))
+    
+    ndim, nwalkers = 2, 24
     
     
-    nsteps = 50
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=([eehat]),
+            pool=pool)
+    
+    # roughly 20 cpu-seconds/step
+    try:
+        data = np.loadtxt('chain_{0}.dat'.format(seed))
+        pos = data[-nwalkers:,1:]
+        lnprob = np.loadtxt('lnprob_{0}.dat'.format(seed))
+    except IOError:
+        nll = lambda *args: -lnprob(*args)
+        result = op.minimize(nll, [7, 0.2], args=(eehat))
+        pos = [result['x'] + 1e-4*np.random.randn(ndim) for i in range(nwalkers)]
+
+    nsteps = 1000
     t0 = time()
-    for i, result in enumerate(sampler.sample(pos, iterations=nsteps)):
+    for i, result in enumerate(sampler.sample(pos, iterations=nsteps, storechain=False)):
         if (i+1) % 10 == 0:
             print("{0:5.1%}".format(float(i)/nsteps))
             print(time()-t0)
             t0 = time()
+        position = result[0]
+        f = open('chain_{0}.dat'.format(seed), 'a')
+        for k in range(position.shape[0]):
+            f.write("{0:4d} {1:s}\n".format(k, np.array2string(position[k]).strip("[]").replace('\n','')))
+        f.close()
     
-    
-    nsteps = 750
-    print(sampler.chain[:,-1,:])
-    t0 = time()
-    for i, result in enumerate(sampler.sample(sampler.chain[:,-1,:], iterations=nsteps)):
-        if (i+1) % 10 == 0:
-            print("{0:5.1%}".format(float(i)/nsteps))
-            print(time()-t0)
-            t0 = time()
-    
-    for i in range(nwalkers):
-        for j in range(ndim):
-            plt.figure(j)
-            plt.plot(sampler.chain[i,:,j], color='k')
-        plt.figure(ndim+1)
-        plt.plot(sampler.lnprobability[i], color='k')
-    
-    
-    plt.figure(2)
-    plt.loglog(ell, eehat, '.')
-    for i in range(len(sampler.chain[:,-1])):
-        ell, ee, te = get_spectra(*sampler.chain[i,-1], spectra=True, lmax=lmax)
-        plt.figure(1)
-        plt.plot(ell,-lnprob_EE_ell(*sampler.chain[i,-1],eehat), color=plt.cm.viridis(i/6))
-        print(sum(lnprob_EE_ell(*sampler.chain[i,-1],eehat)[2:]))
-        plt.figure(2)
-        plt.loglog(ell[2:], ee[2:], color=plt.cm.viridis(i/6))
-        
-    plt.figure(1)
-    plt.plot(ell, -lnprob_EE_ell(7, 0.2, eehat), color='k')
-    print(sum(lnprob_EE_ell(7, 0.2,eehat)[2:]))
-    np.save('chain', sampler.chain)
-    np.save('lnprob', sampler.lnprobability)
+    np.save('chain_{0}'.format(seed), sampler.chain)
+    np.save('lnprob_{0}'.format(seed), sampler.lnprobability)
