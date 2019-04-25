@@ -1,119 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import healpy as hp
 import subprocess
 
 from classy import Class
 from scipy.stats import gmean
+from scipy.integrate import trapz, cumtrapz
 
-
-# Define your cosmology (what is not specified will be set to CLASS default parameters)
-params = {
-    'output': 'tCl pCl lCl',
-    'l_max_scalars': 2500,
-    'lensing': 'yes',
-    'A_s': 2.3e-9,
-    'n_s': 0.965,
-    'tau_reio':0.06,
-    'r': 0.,
-    'modes': 't, s'}
-
-cosmo = Class()
-cosmo.set(params)
-cosmo.compute()
-cls = cosmo.lensed_cl(2500)
-cosmo.struct_cleanup()
-cosmo.empty()
-
-def get_all(tau, lmax=100, rescale=True):
-    params['tau_reio'] = tau
-    if rescale:
-        amp = 2.3e-9*np.exp(-2*0.06)
-        As = amp/np.exp(-2*tau)
-        #As = 2.3e-9
-        params['A_s' ] = As
-
-    cosmo.set(params)
-    cosmo.compute()
-    powers = cosmo.lensed_cl(lmax=lmax)
-    Z = np.ones_like(powers['ell'])*(cosmo.T_cmb()*1e6)**2
-    return powers['tt'][:lmax+1]*Z[:lmax+1], powers['te'][:lmax+1]*Z[:lmax+1], powers['ee'][:lmax+1]*Z[:lmax+1]
-
-
-def get_TE(tau, lmax=100, rescale=True):
-    params['tau_reio'] = tau
-    if rescale:
-        amp = 2.3e-9*np.exp(-2*0.06)
-        As = amp/np.exp(-2*tau)
-        #As = 2.3e-9
-        params['A_s' ] = As
-
-    cosmo.set(params)
-    cosmo.compute()
-    powers = cosmo.lensed_cl(lmax=lmax)
-    Z = np.ones_like(powers['ell'])*(cosmo.T_cmb()*1e6)**2
-    return powers['te'][:lmax+1]*Z[:lmax+1]
-
-def get_TT(tau, lmax=100, rescale=True):
-    params['tau_reio'] = tau
-    if rescale:
-        amp = 2.3e-9*np.exp(-2*0.06)
-        As = amp/np.exp(-2*tau)
-        #As = 2.3e-9
-        params['A_s' ] = As
-
-    cosmo.set(params)
-    cosmo.compute()
-    powers = cosmo.lensed_cl(lmax=lmax)
-    Z = np.ones_like(powers['ell'])*(cosmo.T_cmb()*1e6)**2
-    return powers['tt'][:lmax+1]*Z[:lmax+1]
-
-def get_EE(r=0.01, tau=0.06, lmax=100, rescale=False):
-    params['tau_reio'] = tau
-    if rescale:
-        amp = 2.3e-9*np.exp(-2*0.06)
-        As = amp/np.exp(-2*tau)
-        #As = 2.3e-9
-        params['A_s' ] = As
-    params['r'] = r
-
-    cosmo.set(params)
-    cosmo.compute()
-    powers = cosmo.lensed_cl(lmax=lmax)
-    Z = np.ones_like(powers['ell'])*(1e6*cosmo.T_cmb())**2
-    return powers['ee'][:lmax+1]*Z[:lmax+1]
-
-
-def get_BB(r=0.01, tau=0.06, lmax=100, rescale=False):
-    params['tau_reio'] = tau
-    if rescale:
-        amp = 2.3e-9*np.exp(-2*0.06)
-        As = amp/np.exp(-2*tau)
-        #As = 2.3e-9
-        params['A_s' ] = As
-    params['r'] = r
-
-    cosmo.set(params)
-    cosmo.compute()
-    powers = cosmo.lensed_cl(lmax=lmax)
-    #Z = powers['ell']*(powers['ell']+1)/(2*np.pi)*(cosmo.T_cmb())**2
-    Z = np.ones_like(powers['ell'])*(1e6*cosmo.T_cmb())**2
-    return powers['bb'][:lmax+1]*Z[:lmax+1]
-
-
-def test_BB():
-    for r in np.arange(0, 0.24, 0.04):
-        BB = get_BB(r=r, lmax=2000)
-        ell = np.arange(len(BB))
-        Z = ell*(ell+1)/(2*np.pi)
-        plt.loglog(ell[2:], (BB*Z)[2:], label=r'$r={0}$'.format(r))
-    plt.xlim([2, 2000])
-    plt.xlabel(r'$\ell$')
-    plt.ylabel(r'$\ell(\ell+1)C_\ell/(2\pi)\,[\mathrm{\mu K^2}]$')
-    plt.legend(loc='best')
-    plt.show()
-    return
-
+from memory_profiler import profile
 
 
 
@@ -357,6 +252,268 @@ def test_spectra():
     plt.loglog(clinv[1], '.', label='Inverse')
     plt.legend(loc='best')
     plt.show()
+
+def twinplot(ell, Cl, axes=None, label=None, color='k', marker='.',
+        linestyle=' ', ymin=None, ymax=None, alpha=1, lw=None, spec='EE',
+            xlabels=True, ylabels_l=True, ylabels_r=True):
+    if axes == None:
+        ax = plt.gca()
+        axes = [ax, ax.twinx()]
+
+    axes[0].semilogx(ell, np.log10(Cl), label=label, color=color, marker=marker,
+            linestyle=linestyle, alpha=alpha, lw=lw)
+
+    if (ymin == None) & (ymax == None):
+        ymin, ymax = axes[0].get_ylim()
+    else:
+        ymin, ymax = np.log10(ymin), np.log10(ymax)
+        axes[0].set_ylim(ymin, ymax)
+    xmin, xmax = axes[0].get_xlim()
+    values = np.arange(int(ymin), int(ymax)+1)
+    labels = 10.**values
+    axes[0].set_yticks(values, minor=False)
+
+    # If you do this, you get tick labels like $10^{-16}$.
+    f = mpl.ticker.ScalarFormatter(useOffset=False, useMathText=True)
+    g = lambda x,pos : "${}$".format(f._formatSciNotation('%1.10e' % 10.**x))
+    axes[0].get_yaxis().set_major_formatter(mpl.ticker.FuncFormatter(g))
+    # If you do this, you get tick labels like 1e-16
+    #axes[0].get_yaxis().set_major_formatter(mpl.ticker.ScalarFormatter())
+
+    xticks = np.array([2, 5, 10, 20, 50, 100, 200])
+    axes[0].set_xticks(xticks)
+    axes[0].set_xticklabels(xticks)
+
+
+    l0 = np.array([], dtype='float')
+    labels = np.arange(1, 10)
+    for i in range(values[0]-1, values[-1]+2):
+        l0 = np.concatenate((l0, 10**i*labels))
+    axes[0].set_yticks(np.log10(l0), minor=True)
+    axes[0].set_ylim(ymin, ymax)
+
+    base = np.array([3, 5, 10, 15])
+    labels = np.array([300, 500, 1000, 1500, 3000, 5000,
+        10000, 15000, 30000, 50000, int(1e5), int(1.5e5), int(3e5), int(5e5)]).astype('str')
+    labels = np.concatenate(((10*base).astype('str'), labels))
+    labels = np.concatenate((base.astype('str'), labels))
+    labels = np.concatenate((np.round((10**-1*base),2).astype('str'), labels))
+    labels = np.concatenate(((np.round(10**-2*base,2)).astype('str'), labels))
+
+    # Convert from uKarcmin to uK^2 sr
+    values = np.log10((np.pi*labels.astype('float')/180/60)**2)
+    axes[1].set_yticks(values, minor=False)
+    axes[1].get_yaxis().set_major_formatter(mpl.ticker.FixedFormatter(labels))
+
+
+    l0 = np.array([], dtype='float')
+    labels = np.arange(1, 10, 0.5)
+    for i in range(-2, 6):
+        l0 = np.concatenate((l0, 10**i*labels))
+    axes[1].set_yticks(np.log10((np.pi*l0/180/60)**2), minor=True)
+    axes[1].set_ylim(axes[0].get_ylim())
+
+    if ylabels_l:
+        spec = r'\mathrm{{ {0} }}'.format(spec)
+        axes[0].set_ylabel(r'$C_\ell^' + spec + r'$ [$\mathrm{\mu K^2\,sr}$]')
+    if ylabels_r:
+        axes[1].set_ylabel(r'$w_p^{-1/2}$ [$\mathrm{\mu K\ arcmin}$]')
+
+    if xlabels:
+        axes[0].set_xlabel(r'$\ell$')
+        axes[0].set_xlim(xmin, 95)
+
+
+    return axes
+
+def get_tau(thermo, zmax=100, xmin=2e-4):
+    eta = thermo['conf. time [Mpc]']
+    z = thermo['z']
+    x_e = thermo['x_e']
+    dtaudeta = thermo["kappa' [Mpc^-1]"]
+    sigmaTan_p = dtaudeta/x_e
+    integrand = -sigmaTan_p*x_e
+    return trapz(integrand[(x_e>xmin) & (z<zmax)], x=eta[(x_e>xmin) & (z<zmax)])
+
+def get_tau_z(thermo, zmax=100, xmin=2e-4):
+    eta = thermo['conf. time [Mpc]']
+    z = thermo['z']
+    x_e = thermo['x_e']
+    dtaudeta = thermo["kappa' [Mpc^-1]"]
+    sigmaTan_p = dtaudeta/x_e
+    integrand = -sigmaTan_p*x_e
+    return z, cumtrapz(integrand, x=eta)
+
+
+def get_twotau(thermo, zmax=100, xmin=2e-4):
+    eta = thermo['conf. time [Mpc]']
+    z = thermo['z']
+    x_e = thermo['x_e']
+    dtaudeta = thermo["kappa' [Mpc^-1]"]
+    sigmaTan_p = dtaudeta/x_e
+    integrand = -sigmaTan_p*x_e
+    zre = z[np.where(x_e < 0.5)[0][0]]
+    zsplit = 1+zre
+    tau_lo = trapz(integrand[(x_e>xmin) & (z<zsplit)], x=eta[(x_e>xmin) & (z<zsplit)])
+    tau_hi = trapz(integrand[(x_e>xmin) & (z>zsplit) & (z<zmax)], x=eta[(x_e>xmin) & (z>zsplit) & (z<zmax)])
+    return zsplit, tau_lo, tau_hi
+
+#@profile
+cosmo = Class()
+def get_spectra(zreio, x_e, dz=0.5, history=False, spectra=False, both=False, 
+                all_spectra=False, lmax=100, therm=False, zstartmax=50):
+    #cosmo.struct_cleanup()
+    #cosmo.empty()
+    params = {
+        'output': 'tCl pCl lCl',
+        'l_max_scalars': lmax,
+        'lensing': 'yes',
+        'A_s': 2.3e-9,
+        'n_s': 0.965,
+        'reio_parametrization' : 'reio_many_tanh',
+        'many_tanh_num': 3}
+
+    params['many_tanh_z'] = '3.5,' + str(zreio) +',28'
+    params['many_tanh_xe'] = '-2,-1,'+str(max(x_e, 2e-4))
+    params['many_tanh_width'] = dz
+    params['reionization_z_start_max'] = zstartmax
+
+
+    
+    params['hyper_flat_approximation_nu'] = 7000. # The higher this is, the more exact
+    params['hyper_flat_approximation_nu'] = 1e6 # The higher this is, the more exact
+    params['transfer_neglect_delta_k_S_t0'] = 0.0017 # The lower these are, the more exact
+    params['transfer_neglect_delta_k_S_t1'] = 0.0005
+    params['transfer_neglect_delta_k_S_t2'] = 0.0017
+    params['transfer_neglect_delta_k_S_e'] = 0.0013
+    params['delta_l_max'] = 1000 # difference between l_max in unlensed and lensed spectra
+
+
+    # You HAVE TO run struct_cleanup() after every compute step. It adds 20 MB
+    # per compute call otherwise.
+    cosmo.set(params)
+    cosmo.compute()
+    thermo = cosmo.get_thermodynamics()
+    tau = get_tau(thermo)
+    params['A_s'] = 2.3e-9*np.exp(-2*0.06)/np.exp(-2*tau)
+    cosmo.struct_cleanup()
+    cosmo.set(params)
+    cosmo.compute()
+    Z = (2.7e6)**2
+    if both:
+        thermo = cosmo.get_thermodynamics()
+        z, xe = thermo['z'], thermo['x_e']
+        cls = cosmo.lensed_cl(lmax)
+        cosmo.struct_cleanup()
+        ell, EE, TE = cls['ell'], cls['ee'], cls['te']
+        if all_spectra:
+            return z, xe, ell, EE*Z, TE*Z, cls['tt']*Z
+        else:
+            return z, xe, ell, EE*Z, TE*Z
+
+    elif therm:
+        therm = cosmo.get_thermodynamics()
+        cosmo.struct_cleanup()
+        return therm
+    elif spectra:
+        cls = cosmo.lensed_cl(lmax)
+        cosmo.struct_cleanup()
+        ell, TT, EE, TE = cls['ell'], cls['tt']*Z, cls['ee']*Z, cls['te']*Z
+        if all_spectra:
+            return ell, EE, TE, TT
+        else:
+            return ell, EE, TE
+
+    elif history:
+        thermo = cosmo.get_thermodynamics()
+        cosmo.struct_cleanup()
+        z, xe = thermo['z'], thermo['x_e']
+        return z, xe
+    else:
+        return
+
+def lnprob_EE_ell(zre, x_e, Clhat, N_l=0):
+    # This returns log(P)
+    ell, Cl, TE = get_spectra(zre, x_e, lmax=len(Clhat)-1, spectra=True)
+    Cl += N_l
+    chi2_ell = (2*ell[2:]+1)*(Clhat[2:]/Cl[2:] + np.log(Cl[2:]) - np.log(Clhat[2:])-1)
+    chi2_ell = np.insert(chi2_ell, [0,0], 0)
+    return -chi2_ell/2
+
+def lnprob_wish_ell(zre, x_e, Clhat, N_lT=0, N_lE=0):
+    # This returns log(P)
+    TThat, EEhat, BBhat, TEhat, TBhat, EBhat = Clhat
+    ell, ee, te, tt = get_spectra(zre, x_e,  spectra=True, lmax=len(EEhat)-1, all_spectra=True)
+
+    tt += N_lT
+    ee += N_lE
+    n = 2
+    Cl = np.array([[tt, te], [te, ee]])
+    Cl = np.swapaxes(Cl, 1,2)
+    Cl = np.swapaxes(Cl, 0,1)
+    bla2 = np.linalg.inv(Cl[2:])
+
+    Clhat = np.array([[Clhat[0], Clhat[3]], [Clhat[3], Clhat[1]]])
+    Clhat = np.swapaxes(Clhat, 1,2)
+    Clhat = np.swapaxes(Clhat, 0,1)
+    bla = Clhat[2:]
+    
+    x = np.einsum('ijk,ikl->ijl',bla, bla2)
+    ls = ell[2:]
+    chi2_ell = (2*ls+1)*(np.trace(x, axis1=1, axis2=2) - np.linalg.slogdet(x)[1] - n)
+
+    chi2_ell = np.insert(chi2_ell, [0,0], 0)
+
+
+    return -chi2_ell/2
+
+def get_F_ell(zre, x_e, dzre=5e-5, dxre=1e-5, ell_arr=False, lmin=2, lmax=100,
+        N_lT=0, N_lE=0, test=False, test2=False):
+    Fs = []
+    ell, EE, TE, TT = get_spectra(zre, x_e, lmax=lmax, spectra=True, all_spectra=True)
+    ell, dEEx, dTEx, dTTx = get_spectra(zre, x_e+dxre, lmax=lmax, spectra=True, all_spectra=True)
+    ell, dEEz, dTEz, dTTz = get_spectra(zre+dzre, x_e, lmax=lmax, spectra=True, all_spectra=True)
+    dEEdz = (dEEz - EE)/dzre
+    dTEdz = (dTEz - TE)/dzre
+    dTTdz = (dTTz - TT)/dzre
+    dEEdx = (dEEx - EE)/dxre
+    dTEdx = (dTEx - TE)/dxre
+    dTTdx = (dTTx - TT)/dxre
+
+    ders = [[ [], [], [] ],
+            [ [], [], [] ]]
+    for l in np.arange(lmin, lmax+1):
+        if test:
+            ders[0][0].append(dTTdx[l])
+            ders[0][1].append(dEEdx[l])
+            ders[0][2].append(dTEdx[l])
+            ders[1][0].append(dTTdz[l])
+            ders[1][1].append(dEEdz[l])
+            ders[1][2].append(dTEdz[l])
+            return dTTdx, dEEdx, dTEdx, dTTdz, dEEdz, dTEdz
+        F = np.zeros((2,2))
+        Cl = np.array([[TT[l] + N_lT, TE[l]],[TE[l],EE[l] + N_lE]])
+        dCldx = np.array([[dTTdx[l], dTEdx[l]], [dTEdx[l], dEEdx[l]]])
+        dCldz = np.array([[dTTdz[l], dTEdz[l]], [dTEdz[l], dEEdz[l]]])
+        Clinv = np.linalg.inv(Cl)
+        xx = np.trace(Clinv.dot(dCldx.dot(Clinv.dot(dCldx))))*(2*l+1)/2
+        xz = np.trace(Clinv.dot(dCldx.dot(Clinv.dot(dCldz))))*(2*l+1)/2
+        zz = np.trace(Clinv.dot(dCldz.dot(Clinv.dot(dCldz))))*(2*l+1)/2
+        F[0,0] += zz
+        F[1,0] += xz
+        F[0,1] += xz
+        F[1,1] += xx
+        if l == 10:
+            print('\n')
+            print('l==10')
+            print(Cl)
+            print(Clinv)
+            print(zz, xz, xx)
+            print('\n')
+        Fs.append(F)
+    if test2:
+        return Fs, dTTdx, dEEdx, dTEdx, dTTdz, dEEdz, dTEdz
+    return Fs
 
 
 if __name__ == '__main__':
