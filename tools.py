@@ -432,6 +432,77 @@ def get_spectra(zreio, x_e, dz=0.5, history=False, spectra=False, both=False,
     else:
         return
 
+def get_spectra_simple(zreio, x_e, dz=0.5, history=False, spectra=False, both=False, 
+                all_spectra=False, lmax=100, therm=False, zstartmax=50):
+    #cosmo.struct_cleanup()
+    #cosmo.empty()
+    cosmo = Class()
+    params = {
+        'output': 'tCl pCl lCl',
+        'l_max_scalars': lmax,
+        'lensing': 'yes',
+        'A_s': 2.3e-9,
+        'n_s': 0.965,
+        'reio_parametrization' : 'reio_camb'}
+
+    params['z_reio'] = zreio
+    params['reionization_width'] = dz
+    params['reionization_z_start_max'] = zstartmax
+
+
+    
+    params['hyper_flat_approximation_nu'] = 7000. # The higher this is, the more exact
+    params['hyper_flat_approximation_nu'] = 1e6 # The higher this is, the more exact
+    params['transfer_neglect_delta_k_S_t0'] = 0.0017 # The lower these are, the more exact
+    params['transfer_neglect_delta_k_S_t1'] = 0.0005
+    params['transfer_neglect_delta_k_S_t2'] = 0.0017
+    params['transfer_neglect_delta_k_S_e'] = 0.0013
+    params['delta_l_max'] = 1000 # difference between l_max in unlensed and lensed spectra
+
+
+    # You HAVE TO run struct_cleanup() after every compute step. It adds 20 MB
+    # per compute call otherwise.
+    cosmo.set(params)
+    cosmo.compute()
+    thermo = cosmo.get_thermodynamics()
+    tau = get_tau(thermo)
+    params['A_s'] = 2.3e-9*np.exp(-2*0.06)/np.exp(-2*tau)
+    cosmo.struct_cleanup()
+    cosmo.set(params)
+    cosmo.compute()
+    Z = (2.7e6)**2
+    if both:
+        thermo = cosmo.get_thermodynamics()
+        z, xe = thermo['z'], thermo['x_e']
+        cls = cosmo.lensed_cl(lmax)
+        cosmo.struct_cleanup()
+        ell, EE, TE = cls['ell'], cls['ee'], cls['te']
+        if all_spectra:
+            return z, xe, ell, EE*Z, TE*Z, cls['tt']*Z
+        else:
+            return z, xe, ell, EE*Z, TE*Z
+
+    elif therm:
+        therm = cosmo.get_thermodynamics()
+        cosmo.struct_cleanup()
+        return therm
+    elif spectra:
+        cls = cosmo.lensed_cl(lmax)
+        cosmo.struct_cleanup()
+        ell, TT, EE, TE = cls['ell'], cls['tt']*Z, cls['ee']*Z, cls['te']*Z
+        if all_spectra:
+            return ell, EE, TE, TT
+        else:
+            return ell, EE, TE
+
+    elif history:
+        thermo = cosmo.get_thermodynamics()
+        cosmo.struct_cleanup()
+        z, xe = thermo['z'], thermo['x_e']
+        return z, xe
+    else:
+        return
+
 def lnprob_EE_ell(zre, x_e, Clhat, N_l=0):
     # This returns log(P)
     ell, Cl, TE = get_spectra(zre, x_e, lmax=len(Clhat)-1, spectra=True)
@@ -470,6 +541,7 @@ def lnprob_wish_ell(zre, x_e, Clhat, N_lT=0, N_lE=0):
 def get_F_ell(zre, x_e, dzre=5e-5, dxre=1e-5, ell_arr=False, lmin=2, lmax=100,
         N_lT=0, N_lE=0, test=False, test2=False):
     Fs = []
+    Fs_EE = []
     ell, EE, TE, TT = get_spectra(zre, x_e, lmax=lmax, spectra=True, all_spectra=True)
     ell, dEEx, dTEx, dTTx = get_spectra(zre, x_e+dxre, lmax=lmax, spectra=True, all_spectra=True)
     ell, dEEz, dTEz, dTTz = get_spectra(zre+dzre, x_e, lmax=lmax, spectra=True, all_spectra=True)
@@ -511,8 +583,20 @@ def get_F_ell(zre, x_e, dzre=5e-5, dxre=1e-5, ell_arr=False, lmin=2, lmax=100,
             print(zz, xz, xx)
             print('\n')
         Fs.append(F)
+
+        Cl = EE[l] + N_lE
+        dCldx = dEEdx[l]
+        dCldz = dEEdz[l]
+        Clinv = 1/Cl
+        xx = Clinv*dCldx*Clinv*dCldx*(2*l+1)/2
+        xz = Clinv*dCldx*Clinv*dCldz*(2*l+1)/2
+        zz = Clinv*dCldz*Clinv*dCldz*(2*l+1)/2
+        FEE = np.array([[zz, xz],
+                        [xz, xx]])
+
+        Fs_EE.append(FEE)
     if test2:
-        return Fs, dTTdx, dEEdx, dTEdx, dTTdz, dEEdz, dTEdz
+        return Fs, Fs_EE, dTTdx, dEEdx, dTEdx, dTTdz, dEEdz, dTEdz
     return Fs
 
 
