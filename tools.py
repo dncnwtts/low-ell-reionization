@@ -539,7 +539,7 @@ def lnprob_wish_ell(zre, x_e, Clhat, N_lT=0, N_lE=0):
     return -chi2_ell/2
 
 def get_F_ell(zre, x_e, dzre=5e-5, dxre=1e-5, ell_arr=False, lmin=2, lmax=100,
-        N_lT=0, N_lE=0, test=False, test2=False):
+        N_lT=0, N_lE=0, test=False, test2=False, tau_vars=False):
     Fs = []
     Fs_EE = []
     ell, EE, TE, TT = get_spectra(zre, x_e, lmax=lmax, spectra=True, all_spectra=True)
@@ -551,6 +551,21 @@ def get_F_ell(zre, x_e, dzre=5e-5, dxre=1e-5, ell_arr=False, lmin=2, lmax=100,
     dEEdx = (dEEx - EE)/dxre
     dTEdx = (dTEx - TE)/dxre
     dTTdx = (dTTx - TT)/dxre
+
+    if tau_vars:
+        zsplit, taulo, tauhi = get_twotau(get_spectra(zre, x_e, therm=True))
+        zsplit, d_taulo, _tauhi = get_twotau(get_spectra(zre+dzre, x_e, therm=True))
+        zsplit, _taulo, d_tauhi = get_twotau(get_spectra(zre, x_e+dxre, therm=True))
+
+        dtaulo = d_taulo-taulo
+        dtauhi = d_tauhi-tauhi
+
+        dEEdz *= dzre/dtaulo
+        dTEdz *= dzre/dtaulo
+        dTTdz *= dzre/dtaulo
+        dEEdx *= dxre/dtauhi
+        dTEdx *= dxre/dtauhi
+        dTTdx *= dxre/dtauhi
 
     ders = [[ [], [], [] ],
             [ [], [], [] ]]
@@ -575,13 +590,6 @@ def get_F_ell(zre, x_e, dzre=5e-5, dxre=1e-5, ell_arr=False, lmin=2, lmax=100,
         F[1,0] += xz
         F[0,1] += xz
         F[1,1] += xx
-        if l == 10:
-            print('\n')
-            print('l==10')
-            print(Cl)
-            print(Clinv)
-            print(zz, xz, xx)
-            print('\n')
         Fs.append(F)
 
         Cl = EE[l] + N_lE
