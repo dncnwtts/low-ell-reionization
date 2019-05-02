@@ -8,6 +8,8 @@ import scipy.optimize as op
 import emcee
 from time import time
 
+from tools import get_spectra, get_tau, get_twotau, lnprob_EE_ell
+
 import sys
 from schwimmbad import MPIPool
 
@@ -30,63 +32,11 @@ def lnprob(args, Clhat):
         return -np.inf
     return sum(lnprob_EE_ell(zre, x_e, Clhat)[2:])
 
-def lnprob_EE_ell(zre, x_e, Clhat):
-    ell, Cl, TE = get_spectra(zre, x_e, lmax=len(Clhat)-1, spectra=True)
-    chi2_ell = (2*ell+1)*(Clhat/Cl + np.log(Cl/Clhat)-1)
-    return -chi2_ell#-chi2_exp_ell
+#def lnprob_EE_ell(zre, x_e, Clhat):
+#    ell, Cl, TE = get_spectra(zre, x_e, lmax=len(Clhat)-1, spectra=True)
+#    chi2_ell = (2*ell+1)*(Clhat/Cl + np.log(Cl/Clhat)-1)
+#    return -chi2_ell#-chi2_exp_ell
 
-def get_tau(thermo, zmax=100, xmin=2e-4):
-    eta = thermo['conf. time [Mpc]']
-    z = thermo['z']
-    x_e = thermo['x_e']
-    dtaudeta = thermo["kappa' [Mpc^-1]"]
-    sigmaTan_p = dtaudeta/x_e
-    integrand = -sigmaTan_p*x_e
-    return trapz(integrand[(x_e>xmin) & (z<zmax)], x=eta[(x_e>xmin) & (z<zmax)])
-
-
-def get_twotau(thermo, zmax=100, xmin=2e-4):
-    eta = thermo['conf. time [Mpc]']
-    z = thermo['z']
-    x_e = thermo['x_e']
-    dtaudeta = thermo["kappa' [Mpc^-1]"]
-    sigmaTan_p = dtaudeta/x_e
-    integrand = -sigmaTan_p*x_e
-    zre = z[np.where(x_e < 0.5)[0][0]]
-    zsplit = 1+zre
-    tau_lo = trapz(integrand[(x_e>xmin) & (z<zsplit)], x=eta[(x_e>xmin) & (z<zsplit)])
-    tau_hi = trapz(integrand[(x_e>xmin) & (z>zsplit) & (z<zmax)], x=eta[(x_e>xmin) & (z>zsplit) & (z<zmax)])
-    return zsplit, tau_lo, tau_hi
-
-def get_spectra(zreio, x_e, history=False, spectra=False, both=False, lmax=40, therm=False):
-    params['many_tanh_z'] = '3.5,' + str(zreio) +',28'
-    params['many_tanh_xe'] = '-2,-1,'+str(max(x_e, 2e-4))
-    cosmo.set(params)
-    cosmo.compute()
-    thermo = cosmo.get_thermodynamics()
-    tau = get_tau(thermo)
-    params['A_s'] = 2.3e-9*np.exp(-2*0.06)/np.exp(-2*tau)
-    cosmo.set(params)
-    cosmo.compute()
-
-    thermo = cosmo.get_thermodynamics()
-    cls = cosmo.lensed_cl(lmax)
-    cosmo.struct_cleanup()
-    if both:
-        z, xe = thermo['z'], thermo['x_e']
-        cls = cosmo.lensed_cl(lmax)
-        ell, EE, TE = cls['ell'], cls['ee'], cls['te']
-        return z, xe, ell, EE, TE
-    elif therm:
-        return thermo
-    elif spectra:
-        ell, EE, TE = cls['ell'], cls['ee'], cls['te']
-        return ell, EE, TE
-    elif history:
-        z, xe = thermo['z'], thermo['x_e']
-        return z, xe
-    else:
-        return
 
 if __name__ == '__main__':
 
@@ -102,12 +52,12 @@ if __name__ == '__main__':
     
     
     
-    ell, ee, te = get_spectra(6, 0.05, spectra=True, lmax=lmax)
+    ell, ee, te = get_spectra(6, 0.00, spectra=True, lmax=lmax)
     np.random.seed(seed)
     eehat = hp.alm2cl(hp.synalm(ee, lmax=lmax))
     
     
-    chi2_ell = lnprob_EE_ell(6, 0.05, eehat)
+    chi2_ell = lnprob_EE_ell(6, 0.00, eehat)
     
     
     
