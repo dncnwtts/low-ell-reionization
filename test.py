@@ -6,7 +6,7 @@ seed = 5
 
 from classy import Class
 
-from tools import get_EE, get_TE, get_TT, get_all
+from tools import get_EE, get_TE, get_TT
 
 import healpy as hp
 
