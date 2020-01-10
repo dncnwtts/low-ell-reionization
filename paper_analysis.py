@@ -3,9 +3,6 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 mpl.rcParams['figure.figsize'] = (4,3)
 mpl.rcParams['figure.dpi'] = 300
-#mpl.rcParams['axes.labelsize'] = 'medium'
-#mpl.rcParams['xtick.labelsize'] = 8
-#mpl.rcParams['ytick.labelsize'] = 8
 
 from matplotlib.ticker import (FormatStrFormatter, AutoMinorLocator)
 
@@ -80,6 +77,10 @@ def get_camb_TE(tau):
     return ell, TE/Z
 
 def cartoons(tau=0.06):
+    '''
+    Creates labeled figures that give a heuristic sense of the model used in the
+    paper, as well as the contributions from reionization and recombination.
+    '''
     ell, EEtau = get_camb_EE(tau)
     ell, EE0 = get_camb_EE(0.00)
 
@@ -95,8 +96,6 @@ def cartoons(tau=0.06):
     plt.loglog(l, f0(l), 'k--', lw=0.9, zorder=3)
     plt.loglog(l, f1(l), 'C0')
     plt.loglog(l, f2(l), 'C1')
-    #plt.loglog(ell[2:], reio[2:], 'o', 'C0')
-    #plt.loglog(ell[2:], reco[2:], 'o', 'C1')
 
 
     plt.text(3, 4e-2, 'Reionization', color='C0')
@@ -108,8 +107,6 @@ def cartoons(tau=0.06):
     plt.xlabel(r'$\ell$')
     plt.ylabel(r'$C_\ell^\mathrm{EE}\ [\mathrm{\mu K^2\,sr}]$')
     ax = plt.gca()
-    #ax.spines['right'].set_visible(False)
-    #ax.spines['top'].set_visible(False)
 
     plt.savefig('cartoon1.pdf', bbox_inches='tight')
     plt.savefig('cartoon1.png', bbox_inches='tight')
@@ -139,7 +136,6 @@ def cartoons(tau=0.06):
     fontsize = 12
     z, xe, ell, EE, TE = get_spectra(7.5, 0.2, both=True)
 
-    #fig, (ax0, ax1) = plt.subplots(nrows=2, figsize=(4,5))
     fig0, ax0 = plt.subplots(1)
     ax0.plot(z, xe, color='k')
     ax0.set_xlabel(r'$z$')
@@ -187,13 +183,8 @@ def cartoons(tau=0.06):
     ax0.set_ylim([0, 1.3])
 
     ax0.set_xticks([],[])
-    #plt.yticks([],[])
     ax0.set_yticks([0, 0.5, 1], [0, 0.5, 1])
     ax0.yaxis.set_minor_locator(AutoMinorLocator(5))
-    #ax.spines['right'].set_visible(False)
-    #ax.spines['top'].set_visible(False)
-
-    #plt.subplots_adjust(hspace=0.2)
 
 
     fig0.savefig('cartoon2.pdf', bbox_inches='tight')
@@ -217,7 +208,6 @@ def cartoons(tau=0.06):
     i3 = np.isnan(d['x_e']) & ~np.isnan(d['xe_l'])
     i4 = np.isnan(d['x_e']) & ~np.isnan(d['xe_u']) & np.isnan(d['z'])
     i5 = ~np.isnan(d['xe_l']) & ~np.isnan(d['x_e']) & np.isnan(d['z'])
-    #d.loc[d['xe_l'] is np.nan]
     d1 = d[i1]
     d2 = d[i2]
     d3 = d[i3]
@@ -225,7 +215,6 @@ def cartoons(tau=0.06):
     d5 = d[i5]
     alpha = 1
 
-    #fig1, ax1 = plt.subplots(1)
     z, xe, ell, EE, TE = get_spectra(6.75, 0.05, both=True)
     ax1 = ax0.inset_axes([0.45, 0.45, 0.55, 0.55], facecolor='0.9')
 
@@ -258,8 +247,6 @@ def cartoons(tau=0.06):
     ax1.yaxis.set_minor_locator(AutoMinorLocator(5))
 
     ax1.plot(z, xe, color='k', zorder=-5)
-    #ax1.set_xlabel(r'$z$')
-    #ax1.set_ylabel(r'$x_e(z)$')
 
     ax1.set_xlim([5.1, 8.2])
     ax1.set_ylim([0, 1.3])
@@ -275,389 +262,12 @@ def cartoons(tau=0.06):
 
     return
 
-def fig1(num=50):
-    lw = 1
-    ymin = 3.2e-5
-    ymax = 1.2e-1
-
-    zs = np.linspace(6, 10, num)
-    xes = np.linspace(0, 0.2, num)
-    z0 = 6
-    xe0 = 0
-    
-    fig, axes = plt.subplots(nrows=1, ncols=4, figsize=(12,3), 
-                             gridspec_kw={"width_ratios":[1,1,1,0.05], "wspace":0.6})
-    ax1 = axes[0]
-    ax2 = axes[1]
-    ax3 = axes[2]
-    cax = axes[3]
-    axs2 = [ax2, ax2.twinx()]
-    axs3 = [ax3, ax3.twinx()]
-    for i in range(len(zs))[::-1]:
-        z, xe, ell, EE, TE = get_spectra(zs[i], xe0, both=True)
-        thermo = get_spectra(zs[i], xe0, therm=True)
-        ax1.plot(z, xe, color=plt.cm.magma(i/len(zs)), lw=lw)
-        ax1.set_xlim([0, 40])
-        ax1.set_xlabel(r'$z$')
-        ax1.set_ylabel(r'$x_e(z)$')
-        twinplot(ell, EE, linestyle='-', marker=None, color=plt.cm.magma(i/len(zs)), 
-                 axes=axs2, spec='EE', lw=lw, ymin=ymin, ymax=ymax, ylabels_r=False)
-        twinplot(ell, TE, linestyle='-', marker=None, color=plt.cm.magma(i/len(zs)), 
-                 axes=axs3, spec='TE', lw=lw, ymin=5.5e-3, ymax=5.5)
-    sm = plt.cm.ScalarMappable(cmap=plt.cm.magma, norm=plt.Normalize(vmin=zs.min(), vmax=zs.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$z_\mathrm{re}$')
-    
-    plt.tight_layout()
-    plt.savefig('f1_zre.pdf', bbox_inches='tight')
-    plt.savefig('f1_zre.png', bbox_inches='tight')
-    plt.close('all')
-    
-        
-    fig, axes = plt.subplots(nrows=1, ncols=4, figsize=(12, 3), 
-                             gridspec_kw={"width_ratios":[1,1,1,0.05], "wspace":0.6})
-    ax1 = axes[0]
-    ax2 = axes[1]
-    ax3 = axes[2]
-    cax = axes[3]
-    axs2 = [ax2, ax2.twinx()]
-    axs3 = [ax3, ax3.twinx()]
-    for i in range(len(zs))[::-1]:
-        z, xe, ell, EE, TE = get_spectra(z0, xes[i], both=True)
-        thermo = get_spectra(z0, xes[i], therm=True)
-        _, taulo, tauhi = get_twotau(thermo, zmax=100, xmin=2e-4)
-    
-        ax1.plot(z, xe, color=plt.cm.plasma(i/len(zs)), lw=lw)
-        ax1.set_xlim([0, 40])
-        ax1.set_xlabel(r'$z$')
-        ax1.set_ylabel(r'$x_e$')
-        twinplot(ell, EE, linestyle='-', marker=None, color=plt.cm.plasma(i/len(zs)), 
-                 axes=axs2, spec='EE', lw=lw, ymin=ymin, ymax=ymax, ylabels_r=False)
-        twinplot(ell, TE, linestyle='-', marker=None, color=plt.cm.plasma(i/len(zs)), 
-                 axes=axs3, spec='TE', lw=lw, ymin=5.5e-3, ymax=5.5)
-    sm = plt.cm.ScalarMappable(cmap=plt.cm.plasma, norm=plt.Normalize(vmin=xes.min(), vmax=xes.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$x_e^\mathrm{min}$', ticks=[0, 0.1, 0.2])
-    
-    #plt.tight_layout()
-    plt.savefig('f1_xmin.pdf', bbox_inches='tight')
-    plt.savefig('f1_xmin.png', bbox_inches='tight')
-    plt.close('all')
-    
-    
-    fig, axes = plt.subplots(nrows=1, ncols=4, figsize=(12, 3), 
-                             gridspec_kw={"width_ratios":[1,1,1,0.05], "wspace":0.6})
-    ax1 = axes[0]
-    ax2 = axes[1]
-    ax3 = axes[2]
-    cax = axes[3]
-    axs2 = [ax2, ax2.twinx()]
-    axs3 = [ax3, ax3.twinx()]
-    dzs = np.linspace(0.5, 10, len(xes))
-    #z0 = 8
-    for i in range(len(dzs))[::-1]:
-        #z, xe, ell, EE, TE = get_spectra(z0, xe0, dz=dzs[i], both=True,
-                #zstartmax=200)
-        z, xe, ell, EE, TE = get_spectra_simple(z0, xe0, dz=dzs[i], both=True,
-                zstartmax=200)
-        #thermo = get_spectra(z0, xe0, dz=dzs[i], therm=True)
-        #_, taulo, tauhi = get_twotau(thermo, zmax=100, xmin=2e-4)
-    
-        ax1.plot(z, xe, color=plt.cm.inferno(i/len(dzs)),lw=lw)
-        ax1.set_xlim([0, 40])
-        ax1.set_xlabel(r'$z$')
-        ax1.set_ylabel(r'$x_e$')
-        twinplot(ell, EE, linestyle='-', marker=None, color=plt.cm.inferno(i/len(dzs)), 
-                 axes=axs2, spec='EE', lw=lw, ymin=ymin, ymax=ymax, ylabels_r=False, ylabels_l=True)
-        twinplot(ell, TE, linestyle='-', marker=None, color=plt.cm.inferno(i/len(dzs)), 
-                 axes=axs3, spec='TE', lw=lw, ymin=5.5e-3, ymax=5.5, ylabels_l=True)
-    sm = plt.cm.ScalarMappable(cmap=plt.cm.inferno, norm=plt.Normalize(vmin=dzs.min(), vmax=dzs.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$\delta z_\mathrm{re}$')
-    #plt.tight_layout()
-    plt.savefig('f1_dz.pdf', bbox_inches='tight')
-    plt.savefig('f1_dz.png', bbox_inches='tight')
-    plt.close('all')
-
-    fig, axes = plt.subplots(nrows=1, ncols=4, figsize=(12, 3), 
-                             gridspec_kw={"width_ratios":[1,1,1,0.05], "wspace":0.6})
-    ax1 = axes[0]
-    ax2 = axes[1]
-    ax3 = axes[2]
-    cax = axes[3]
-    axs2 = [ax2, ax2.twinx()]
-    axs3 = [ax3, ax3.twinx()]
-    dzs = np.linspace(0.5, 10, len(xes))
-    zts = np.linspace(20, 35, len(xes))
-    #z0 = 8
-    for i in range(len(zts))[::-1]:
-        #z, xe, ell, EE, TE = get_spectra(z0, xe0, dz=dzs[i], both=True,
-                #zstartmax=200)
-        z, xe, ell, EE, TE = get_spectra(z0, 0.1, z_t=zts[i], both=True,
-                zstartmax=200)
-        #thermo = get_spectra(z0, xe0, dz=dzs[i], therm=True)
-        #_, taulo, tauhi = get_twotau(thermo, zmax=100, xmin=2e-4)
-    
-        ax1.plot(z, xe, color=plt.cm.cividis(i/len(dzs)),lw=lw)
-        twinplot(ell, EE, linestyle='-', marker=None, color=plt.cm.cividis(i/len(dzs)), 
-                 axes=axs2, spec='EE', lw=lw, ymin=ymin, ymax=ymax,
-                 ylabels_r=False, ylabels_l=False)
-        twinplot(ell, TE, linestyle='-', marker=None, color=plt.cm.cividis(i/len(dzs)), 
-                 axes=axs3, spec='TE', lw=lw, ymin=5.5e-3, ymax=5.5,
-                 ylabels_l=False, ylabels_r=False)
-
-    ax1.set_xlim([0, 40])
-    ax1.minorticks_on()
-    ax1.set_xlabel(r'$z$')
-    ax1.set_ylabel(r'$x_e$')
-    ax2.set_title(r'$C_\ell^\mathrm{EE}$')
-    ax3.set_title(r'$C_\ell^\mathrm{TE}$')
-    sm = plt.cm.ScalarMappable(cmap=plt.cm.cividis, norm=plt.Normalize(vmin=zts.min(), vmax=zts.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$z_\mathrm t$')
-    #plt.tight_layout()
-    plt.savefig('f1_zt.pdf', bbox_inches='tight')
-    plt.savefig('f1_zt.png', bbox_inches='tight')
-    plt.close('all')
-    return
-
-
-def fig1_alt(num=50):
-    lw = 1
-    ymin = 3.2e-5
-    ymax = 1.2e-1
-
-    zs = np.linspace(6, 10, num)
-    xes = np.linspace(0, 0.2, num)
-    z0 = 6
-    xe0 = 0
-    
-    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(9,3), 
-                             gridspec_kw={"width_ratios":[1,1,0.05], "wspace":0.6})
-    ax1 = axes[0]
-    ax2 = axes[1]
-    cax = axes[2]
-    axs2 = [ax2, ax2.twinx()]
-    for i in range(len(zs))[::-1]:
-        z, xe, ell, EE, TE = get_spectra(zs[i], xe0, both=True)
-        thermo = get_spectra(zs[i], xe0, therm=True)
-        ax1.plot(z, xe, color=plt.cm.magma(i/len(zs)), lw=lw)
-        ax1.set_xlim([0, 40])
-        ax1.set_xlabel(r'$z$')
-        ax1.set_ylabel(r'$x_e$')
-        twinplot(ell, EE, linestyle='-', marker=None, color=plt.cm.magma(i/len(zs)), 
-                 axes=axs2, spec='EE', lw=lw, ymin=ymin, ymax=ymax,
-                 ylabels_r=True)
-    sm = plt.cm.ScalarMappable(cmap=plt.cm.magma, norm=plt.Normalize(vmin=zs.min(), vmax=zs.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$z_\mathrm{re}$')
-    
-    plt.tight_layout()
-    plt.savefig('f1_zre_alt.pdf', bbox_inches='tight')
-    plt.savefig('f1_zre_alt.png', bbox_inches='tight')
-    plt.close('all')
-    
-        
-    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(9, 3), 
-                             gridspec_kw={"width_ratios":[1,1,0.05], "wspace":0.6})
-    ax1 = axes[0]
-    ax2 = axes[1]
-    cax = axes[2]
-    axs2 = [ax2, ax2.twinx()]
-    for i in range(len(zs))[::-1]:
-        z, xe, ell, EE, TE = get_spectra(z0, xes[i], both=True)
-        thermo = get_spectra(z0, xes[i], therm=True)
-        _, taulo, tauhi = get_twotau(thermo, zmax=100, xmin=2e-4)
-    
-        ax1.plot(z, xe, color=plt.cm.plasma(i/len(zs)), lw=lw)
-        ax1.set_xlim([0, 40])
-        ax1.set_xlabel(r'$z$')
-        ax1.set_ylabel(r'$x_e$')
-        twinplot(ell, EE, linestyle='-', marker=None, color=plt.cm.plasma(i/len(zs)), 
-                 axes=axs2, spec='EE', lw=lw, ymin=ymin, ymax=ymax,
-                 ylabels_r=True)
-    sm = plt.cm.ScalarMappable(cmap=plt.cm.plasma, norm=plt.Normalize(vmin=xes.min(), vmax=xes.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$x_e^\mathrm{min}$', ticks=[0, 0.1, 0.2])
-    
-    #plt.tight_layout()
-    plt.savefig('f1_xmin_alt.pdf', bbox_inches='tight')
-    plt.savefig('f1_xmin_alt.png', bbox_inches='tight')
-    plt.close('all')
-    
-    
-    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(9, 3), 
-                             gridspec_kw={"width_ratios":[1,1,0.05], "wspace":0.6})
-    ax1 = axes[0]
-    ax2 = axes[1]
-    cax = axes[2]
-    axs2 = [ax2, ax2.twinx()]
-    dzs = np.linspace(0.5, 10, len(xes))
-    #z0 = 8
-    for i in range(len(dzs))[::-1]:
-        #z, xe, ell, EE, TE = get_spectra(z0, xe0, dz=dzs[i], both=True,
-                #zstartmax=200)
-        z, xe, ell, EE, TE = get_spectra_simple(z0, xe0, dz=dzs[i], both=True,
-                zstartmax=200)
-        #thermo = get_spectra(z0, xe0, dz=dzs[i], therm=True)
-        #_, taulo, tauhi = get_twotau(thermo, zmax=100, xmin=2e-4)
-    
-        ax1.plot(z, xe, color=plt.cm.inferno(i/len(dzs)),lw=lw)
-        ax1.set_xlim([0, 40])
-        ax1.set_xlabel(r'$z$')
-        ax1.set_ylabel(r'$x_e$')
-        twinplot(ell, EE, linestyle='-', marker=None, color=plt.cm.inferno(i/len(dzs)), 
-                 axes=axs2, spec='EE', lw=lw, ymin=ymin, ymax=ymax,
-                 ylabels_r=True, ylabels_l=True)
-    sm = plt.cm.ScalarMappable(cmap=plt.cm.inferno, norm=plt.Normalize(vmin=dzs.min(), vmax=dzs.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$\delta z_\mathrm{re}$')
-    #plt.tight_layout()
-    plt.savefig('f1_dz_alt.pdf', bbox_inches='tight')
-    plt.savefig('f1_dz_alt.png', bbox_inches='tight')
-    plt.close('all')
-
-    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(9, 3), 
-                             gridspec_kw={"width_ratios":[1,1,0.05], "wspace":0.6})
-    ax1 = axes[0]
-    ax2 = axes[1]
-    cax = axes[2]
-    axs2 = [ax2, ax2.twinx()]
-    dzs = np.linspace(0.5, 10, len(xes))
-    zts = np.linspace(20, 35, len(xes))
-    #z0 = 8
-    for i in range(len(zts))[::-1]:
-        #z, xe, ell, EE, TE = get_spectra(z0, xe0, dz=dzs[i], both=True,
-                #zstartmax=200)
-        z, xe, ell, EE, TE = get_spectra(z0, 0.1, z_t=zts[i], both=True,
-                zstartmax=200)
-        #thermo = get_spectra(z0, xe0, dz=dzs[i], therm=True)
-        #_, taulo, tauhi = get_twotau(thermo, zmax=100, xmin=2e-4)
-    
-        ax1.plot(z, xe, color=plt.cm.cividis(i/len(dzs)),lw=lw)
-        twinplot(ell, EE, linestyle='-', marker=None, color=plt.cm.cividis(i/len(dzs)), 
-                 axes=axs2, spec='EE', lw=lw, ymin=ymin, ymax=ymax,
-                 ylabels_r=True, ylabels_l=False)
-
-    ax1.set_xlim([0, 40])
-    ax1.minorticks_on()
-    ax1.set_xlabel(r'$z$')
-    ax1.set_ylabel(r'$x_e$')
-    ax2.set_title(r'$C_\ell^\mathrm{EE}$')
-    sm = plt.cm.ScalarMappable(cmap=plt.cm.cividis, norm=plt.Normalize(vmin=zts.min(), vmax=zts.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$z_\mathrm t$')
-    #plt.tight_layout()
-    plt.savefig('f1_zt_alt.pdf', bbox_inches='tight')
-    plt.savefig('f1_zt_alt.png', bbox_inches='tight')
-    plt.close('all')
-    return
-
-def fig1_big(num=50):
-    lw = 1
-    ymin = 3.2e-5
-    ymax = 1.2e-1
-
-    zs = np.linspace(6, 10, num)
-    xes = np.linspace(0, 0.2, num)
-    z0 = 6
-    xe0 = 0
-    
-    fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(12,9), 
-                             gridspec_kw={"width_ratios":[1,1,1,0.05], "wspace":0.6})
-    ax1 = axes[0][0]
-    ax2 = axes[0][1]
-    ax3 = axes[0][2]
-    cax = axes[0][3]
-    axs2 = [ax2, ax2.twinx()]
-    axs3 = [ax3, ax3.twinx()]
-    for i in range(len(zs))[::-1]:
-        z, xe, ell, EE, TE = get_spectra(zs[i], xe0, both=True)
-        thermo = get_spectra(zs[i], xe0, therm=True)
-        ax1.plot(z, xe, color=plt.cm.magma(i/len(zs)), lw=lw)
-        ax1.set_xlim([0, 40])
-        ax1.set_xlabel(r'$z$')
-        ax1.set_ylabel(r'$x_e$')
-        twinplot(ell, EE, linestyle='-', marker=None, color=plt.cm.magma(i/len(zs)), 
-                 axes=axs2, spec='EE', lw=lw, ymin=ymin, ymax=ymax, ylabels_r=False)
-        twinplot(ell, TE, linestyle='-', marker=None, color=plt.cm.magma(i/len(zs)), 
-                 axes=axs3, spec='TE', lw=lw, ymin=5.5e-3, ymax=5.5)
-    sm = plt.cm.ScalarMappable(cmap=plt.cm.magma, norm=plt.Normalize(vmin=zs.min(), vmax=zs.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$z_\mathrm{re}$')
-    
-    #plt.tight_layout()
-    #plt.savefig('f1_zre.pdf', bbox_inches='tight')
-    #plt.savefig('f1_zre.png', bbox_inches='tight')
-    #plt.close('all')
-    
-        
-    ax1 = axes[1][0]
-    ax2 = axes[1][1]
-    ax3 = axes[1][2]
-    cax = axes[1][3]
-    axs2 = [ax2, ax2.twinx()]
-    axs3 = [ax3, ax3.twinx()]
-    for i in range(len(zs))[::-1]:
-        z, xe, ell, EE, TE = get_spectra(z0, xes[i], both=True)
-        thermo = get_spectra(z0, xes[i], therm=True)
-        _, taulo, tauhi = get_twotau(thermo, zmax=100, xmin=2e-4)
-    
-        ax1.plot(z, xe, color=plt.cm.plasma(i/len(zs)), lw=lw)
-        ax1.set_xlim([0, 40])
-        ax1.set_xlabel(r'$z$')
-        ax1.set_ylabel(r'$x_e$')
-        twinplot(ell, EE, linestyle='-', marker=None, color=plt.cm.plasma(i/len(zs)), 
-                 axes=axs2, spec='EE', lw=lw, ymin=ymin, ymax=ymax, ylabels_r=False)
-        twinplot(ell, TE, linestyle='-', marker=None, color=plt.cm.plasma(i/len(zs)), 
-                 axes=axs3, spec='TE', lw=lw, ymin=5.5e-3, ymax=5.5)
-    sm = plt.cm.ScalarMappable(cmap=plt.cm.plasma, norm=plt.Normalize(vmin=xes.min(), vmax=xes.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$x_e^\mathrm{min}$', ticks=[0, 0.1, 0.2])
-    
-    #plt.tight_layout()
-    #plt.savefig('f1_xmin.pdf', bbox_inches='tight')
-    #plt.savefig('f1_xmin.png', bbox_inches='tight')
-    #plt.close('all')
-    
-    
-    ax1 = axes[2][0]
-    ax2 = axes[2][1]
-    ax3 = axes[2][2]
-    cax = axes[2][3]
-    axs2 = [ax2, ax2.twinx()]
-    axs3 = [ax3, ax3.twinx()]
-    dzs = np.linspace(0.5, 10, len(xes))
-    #z0 = 8
-    for i in range(len(dzs))[::-1]:
-        #z, xe, ell, EE, TE = get_spectra(z0, xe0, dz=dzs[i], both=True,
-                #zstartmax=200)
-        z, xe, ell, EE, TE = get_spectra_simple(z0, xe0, dz=dzs[i], both=True,
-                zstartmax=200)
-        #thermo = get_spectra(z0, xe0, dz=dzs[i], therm=True)
-        #_, taulo, tauhi = get_twotau(thermo, zmax=100, xmin=2e-4)
-    
-        ax1.plot(z, xe, color=plt.cm.inferno(i/len(dzs)),lw=lw)
-        ax1.set_xlim([0, 40])
-        ax1.set_xlabel(r'$z$')
-        ax1.set_ylabel(r'$x_e$')
-        twinplot(ell, EE, linestyle='-', marker=None, color=plt.cm.inferno(i/len(dzs)), 
-                 axes=axs2, spec='EE', lw=lw, ymin=ymin, ymax=ymax, ylabels_r=False, ylabels_l=True)
-        twinplot(ell, TE, linestyle='-', marker=None, color=plt.cm.inferno(i/len(dzs)), 
-                 axes=axs3, spec='TE', lw=lw, ymin=5.5e-3, ymax=5.5, ylabels_l=True)
-    sm = plt.cm.ScalarMappable(cmap=plt.cm.inferno, norm=plt.Normalize(vmin=dzs.min(), vmax=dzs.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$\delta z_\mathrm{re}$')
-    plt.tight_layout()
-    #plt.savefig('f1_dz.pdf', bbox_inches='tight')
-    #plt.savefig('f1_dz.png', bbox_inches='tight')
-    #plt.close('all')
-
-    plt.savefig('f1_big.pdf', bbox_inches='tight')
-
-    return
-
 def fig1_transp(num=50):
+    '''
+    Plots the reionization histories, EE power spectra, and TE power spectra as
+    a function of the reionization redshift, the high-redshift component, and
+    the width of reionizatino.
+    '''
     lw = 1
     ymin = 3.2e-5
     ymax = 1.2e-1
@@ -729,7 +339,6 @@ def fig1_transp(num=50):
         ax1.minorticks_on()
         ax1.set_xlim([0, 30])
         ax1.set_xlabel(r'$z$', labelpad=-7)
-        #ax1.set_ylabel(r'$x_e$')
         ax1.set_yticklabels([])
         twinplot(ell, EE, linestyle='-', marker=None, color=c2(i/len(zs)), 
                  axes=axs2, spec='EE', lw=lw, ymin=ymin, ymax=ymax,
@@ -766,20 +375,14 @@ def fig1_transp(num=50):
     axs2 = [ax2, ax2.twinx()]
     axs3 = [ax3, ax3.twinx()]
     dzs = np.linspace(0.5, 10, len(xes))
-    #z0 = 8
     for i in range(len(dzs))[::-1]:
-        #z, xe, ell, EE, TE = get_spectra(z0, xe0, dz=dzs[i], both=True,
-                #zstartmax=200)
         z, xe, ell, EE, TE = get_spectra_simple(z0, xe0, dz=dzs[i], both=True,
                 zstartmax=200)
-        #thermo = get_spectra(z0, xe0, dz=dzs[i], therm=True)
-        #_, taulo, tauhi = get_twotau(thermo, zmax=100, xmin=2e-4)
     
         ax1.plot(z, xe, color=c3(i/len(dzs)),lw=lw)
         ax1.minorticks_on()
         ax1.set_xlim([0, 30])
         ax1.set_xlabel(r'$z$', labelpad=-7)
-        #ax1.set_ylabel(r'$x_e$')
         ax1.set_yticklabels([])
         twinplot(ell, EE, linestyle='-', marker=None, color=c3(i/len(dzs)), 
                  axes=axs2, spec='EE', lw=lw, ymin=ymin, ymax=ymax,
@@ -817,8 +420,7 @@ def fig1_transp(num=50):
 
 def fig2_1(num=50, n_noises=30):
     '''
-    z_re constraints only, EE and Wishart. What do I want this plot to look
-    like? How about N_l^TT = 0, crank up N_l^EE.
+    z_re constraints only, EE and Wishart.
 
     alphas increase as noise decreases
     C0 for Wishart, C1 for EE only.
@@ -2115,14 +1717,6 @@ def fig5(num=50):
     zres = np.linspace(7, 9, num)
     N_lEE = 1e-6
     N_lTTs = np.logspace(-2, 2, 5)
-    #fig, axes = plt.subplots(nrows=1, ncols=2, 
-    #                         gridspec_kw={"width_ratios":[1,0.05], "wspace":0.1})
-    #ax = axes[0]
-    #cax = axes[1]
-    #sm = plt.cm.ScalarMappable(cmap=plt.cm.viridis,
-    #        norm=mpl.colors.LogNorm(vmin=N_lTTs.min(), vmax=N_lTTs.max()))
-    #sm._A = []
-    #fig.colorbar(sm, cax=cax, label=r'$N_\ell^\mathrm{TT}$')
     fig, ax = plt.subplots(1)
 
     N_lTTs = [1e-6]
@@ -2149,10 +1743,6 @@ def fig5(num=50):
     ax.set_ylabel(r'$P(z_\mathrm{re}|x_e^\mathrm{min}=0,\{\hat{\boldsymbol C}_\ell\})$')
     legend = ax.legend(loc='best')
 
-
-    fig.savefig('f5.pdf', bbox_inches='tight')
-    fig.savefig('f5.png', bbox_inches='tight')
-    plt.close('all')
 
     plt.figure()
 
@@ -2578,100 +2168,8 @@ def TT_constraint():
     plt.show()
     return
 
-'''
-The big things Graeme pointed out were that I should be taking the means of the
-log-likelihoods (or products of the likelihoods) for many different clhat
-realizations, and how that would be a good way of showing what the different
-distributions look like.
-'''
 
-def fig_mean_realizations(n_theta, n_real, zre=8, lmin=2, lmax=100):
-    zres = np.linspace(4,12,n_theta)
-
-    ell, EE, TE, TT = get_spectra(zre, 0, lmax=lmax, spectra=True,\
-            all_spectra=True)
-    Cl_th = np.array([TT, EE, 0*EE, TE])
-    Cl_hats = []
-    TEhats = []
-    lnL_arr_TE = []
-    lnL_arr_EE = []
-    lnL_arr_wish = []
-
-    plt.figure(figsize=(4,6))
-    ax1 = plt.subplot(311)
-    ax2 = plt.subplot(312, sharex=ax1, sharey=ax1)
-    ax3 = plt.subplot(313, sharex=ax1, sharey=ax1)
-
-    ax1.set_ylabel(r'$\mathcal L(z_\mathrm{re}|\hat C_\ell^\mathrm{TE})$')
-    ax3.set_ylabel(r'$\mathcal L(z_\mathrm{re}|\hat{\boldsymbol C}_\ell)$')
-    ax3.set_xlabel(r'$z_\mathrm{re}$')
-    ax2.set_ylabel(r'$\mathcal L(z_\mathrm{re}|\hat C_\ell^\mathrm{EE})$')
-    plt.setp(ax1.get_xticklabels(), visible=False)
-    plt.setp(ax2.get_xticklabels(), visible=False)
-
-    lnLs_TE = np.zeros_like(zres)
-    lnLs_EE = np.zeros_like(zres)
-    lnLs_wish = np.zeros_like(zres)
-    for i in range(n_real):
-        Cl_hat = hp.alm2cl(hp.synalm(Cl_th, new=True))
-        Cl_hats.append(Cl_hat)
-    for i in range(n_real):
-        if i % int(n_real*0.05) == 0:
-            print(i, n_real)
-        for j in range(len(zres)):
-            chi2_TE   = lnprob_TE_ell(zres[j], 0, Cl_hats[i][3])
-            chi2_EE   = lnprob_EE_ell(zres[j], 0, Cl_hats[i][1])
-            chi2_wish = lnprob_wish_ell(zres[j], 0, Cl_hats[i])
-
-            lnLs_TE[j]   = sum(chi2_TE[lmin:])
-            lnLs_EE[j]   = sum(chi2_EE[lmin:])
-            lnLs_wish[j] = sum(chi2_wish[lmin:])
-        
-        lnL_arr_TE.append(lnLs_TE - max(lnLs_TE))
-        lnL_arr_EE.append(lnLs_EE - max(lnLs_EE))
-        lnL_arr_wish.append(lnLs_wish - max(lnLs_wish))
-
-        a = 0.01
-        if i < 500:
-            ax1.plot(zres, np.exp(lnL_arr_TE[i]), color='k', alpha=a)
-            ax2.plot(zres, np.exp(lnL_arr_EE[i]), color='k', alpha=a)
-            ax3.plot(zres, np.exp(lnL_arr_wish[i]), color='k', alpha=a)
-
-
-    plt.savefig('test2.pdf', bbox_inches='tight')
-    plt.close()
-    L1 = np.exp(np.nanmean(lnL_arr_TE, axis=0))
-    L2 = np.exp(np.nanmean(lnL_arr_EE, axis=0))
-    L3 = np.exp(np.nanmean(lnL_arr_wish, axis=0))    
-    plt.plot(zres, L1, label=r'$\hat C_\ell^\mathrm{TE}$')
-    plt.plot(zres, L2, label=r'$\hat C_\ell^\mathrm{EE}$')
-    plt.plot(zres, L3, label=r'$\hat C_\ell^\mathrm{TT}+\hat C_\ell^\mathrm{TE}+\hat C_\ell^\mathrm{EE}$')
-
-    mu1 = trapz(L1*zres, zres)/trapz(L1, zres)
-    mu2 = trapz(L2*zres, zres)/trapz(L2, zres)
-    mu3 = trapz(L3*zres, zres)/trapz(L3, zres)
-
-    var1 = trapz(L1*(zres-mu1)**2, zres)/trapz(L1, zres)
-    var2 = trapz(L2*(zres-mu2)**2, zres)/trapz(L2, zres)
-    var3 = trapz(L3*(zres-mu3)**2, zres)/trapz(L3, zres)
-
-    skew1 = trapz(L1*(zres-mu1)**3, zres)/trapz(L1, zres)/var1**1.5
-    skew2 = trapz(L2*(zres-mu2)**3, zres)/trapz(L2, zres)/var2**1.5
-    skew3 = trapz(L3*(zres-mu3)**3, zres)/trapz(L3, zres)/var3**1.5
-
-    print(mu1, var1**0.5, skew1)
-    print(mu2, var2**0.5, skew2)
-    print(mu3, var3**0.5, skew3)
-
-    #plt.axvline(8, color='k', linestyle=':')
-    plt.xlim([5.5, 10.5])
-    plt.xlabel(r'$z_\mathrm{re}$')
-    plt.ylabel(r'$\langle\mathcal L(z_\mathrm{re}|\hat C_\ell)\rangle$')
-    plt.legend(loc='best')
-    plt.savefig('test.pdf', bbox_inches='tight')
-
-
-def fig_mean_realizations_tau(n_theta, n_real, tau=0.06, lmin=2, lmax=100,
+def fig5(n_theta, n_real, tau=0.06, lmin=2, lmax=100,
          wp=0):
     taus = np.linspace(0.02,0.0925, n_theta)
 
@@ -2787,95 +2285,13 @@ def fig_mean_realizations_tau(n_theta, n_real, tau=0.06, lmin=2, lmax=100,
 
 
 
-def fig_mean_realizations_tau_fixed(n_theta, n_realizations):
-    wps = np.logspace(np.log10(0.65), np.log10(230), 25)
-    noises = []
-    means = []
-    skews = []
-    for wp in wps:
-        mus, vars, sks = fig_mean_realizations_tau(n_theta, n_realizations, wp=wp)
-        varTE, varEE, varall = vars
-        muTE, muEE, muall = mus
-        skewTE, skewEE, skewall = sks
-        noises.append([varTE, varEE, varall])
-        means.append([muTE, muEE, muall])
-        skews.append([skewTE, skewEE, skewall])
-    noises = np.array(noises)
-    means = np.array(means)
-    skews = np.array(skews)
-
-    plt.figure()
-    plt.plot(wps, noises[:,2]**0.5, label=r'$\sigma_{\tau}$ from $\hat C_\ell^\mathrm{TT}+\hat C_\ell^\mathrm{TE}+\hat C_\ell^\mathrm{EE}$')
-    plt.plot(wps, noises[:,1]**0.5, label=r'$\sigma_{\tau}$ from $\hat C_\ell^\mathrm{EE}$')
-    plt.plot(wps, noises[:,0]**0.5, label=r'$\sigma_{\tau}$ from $\hat C_\ell^\mathrm{TE}$')
-
-    plt.xlabel(r'$w_p^{-1/2}\ [\mathrm{\mu K\,arcmin}]$')
-    plt.ylabel(r'$\sigma_\tau$')
-    plt.ylim(ymin=0)
-    plt.xscale('log')
-    yticks = np.arange(0.000, plt.gca().get_ylim()[1], 0.002)
-    plt.yticks(yticks, yticks)
-    #plt.axhline(0.007, color='k', linestyle='--',
-    #        label=r'$\sigma_\tau$ from \textit{Planck} $\hat C_\ell^\mathrm{EE}$')
-    ax = plt.gca()
-    ax.yaxis.set_major_formatter(FormatStrFormatter('%.3f'))
-    ax.yaxis.set_minor_locator(AutoMinorLocator(2))
-
-    plt.xticks([1,10,100],[1,10,100])
-    plt.xlim([0.65, 230])
-    plt.legend(loc='best')
-
-    plt.savefig('test_noises.pdf', bbox_inches='tight')
-    plt.savefig('comp_sigma_taus.pdf', bbox_inches='tight')
-
-    plt.figure()
-
-    plt.plot(wps, means[:,2], label=r'$\mu_{\tau}$ from $\hat C_\ell^\mathrm{TT}+\hat C_\ell^\mathrm{TE}+\hat C_\ell^\mathrm{EE}$')
-    plt.plot(wps, means[:,1], label=r'$\mu_{\tau}$ from $\hat C_\ell^\mathrm{EE}$')
-    plt.plot(wps, means[:,0], label=r'$\mu_{\tau}$ from $\hat C_\ell^\mathrm{TE}$')
-
-    plt.xlabel(r'$w_p^{-1/2}\ [\mathrm{\mu K\,arcmin}]$')
-    plt.ylabel(r'$\mu_\tau$')
-    plt.xscale('log')
-
-    plt.xticks([1,10,100],[1,10,100])
-    plt.xlim([0.65, 230])
-    plt.legend(loc='best')
-    plt.savefig('test_means.pdf', bbox_inches='tight')
-
-    plt.figure()
-    plt.plot(wps, skews[:,2], label=r'$\gamma_{\tau}$ from $\hat C_\ell^\mathrm{TT}+\hat C_\ell^\mathrm{TE}+\hat C_\ell^\mathrm{EE}$')
-    plt.plot(wps, skews[:,1], label=r'$\gamma_{\tau}$ from $\hat C_\ell^\mathrm{EE}$')
-    plt.plot(wps, skews[:,0], label=r'$\gamma_{\tau}$ from $\hat C_\ell^\mathrm{TE}$')
-
-    plt.xlabel(r'$w_p^{-1/2}\ [\mathrm{\mu K\,arcmin}]$')
-    plt.ylabel(r'$\gamma_\tau$')
-    plt.xscale('log')
-
-    plt.xticks([1,10,100],[1,10,100])
-    plt.xlim([0.65, 230])
-    plt.legend(loc='best')
-    plt.savefig('test_skews.pdf', bbox_inches='tight')
-
-    plt.show()
-
-
 if __name__ == '__main__':
     zre, xe = 6.75, 0.05
-    n_theta = 100
     n_theta = 2**7
-    #n_theta = 8
     nnoise = 30
-    #nnoise = 4
-    #_,taulo,tauhi=get_twotau(get_spectra(7, 0.05, therm=True))
-    #print(taulo, tauhi, taulo+tauhi)
-    #fig1(num=n_theta)
-    #fig1_big(num=n_theta)
-    #fig1_transp(num=n_theta)
-    #fig1_alt(num=n_theta)
+    fig1_transp(num=n_theta)
     #fig2(num=n_theta, n_noises=nnoise)
     #fig2_alt(num=n_theta, n_noises=nnoise)
-    #fig2_wrong(num=n_theta, n_noises=nnoise)
     #fig3_rednoise(zre=7.2, xe=0.03, lmin=2, lmax=29)
     #for n in np.arange(0, 200, 30):
     #    fig3_ell_var(noise=n)
@@ -2890,38 +2306,31 @@ if __name__ == '__main__':
     #   fig4_alt(num=n_theta, n_noises=nnoise)
     #fig5(num=n_theta)
     #fig5_alt(num=n_theta)
-    #for wp in np.arange(0, 201, 10):
-    #    fig3_ell_var(noise=wp)
-    #    fig6(num=n_theta*2-1, wp=wp)
-    #fig3_ell_var(zre=zre, noise=0)
-    #fig6(num=n_theta*2-1, wp=0)
 
-    #testfig3(ntests=2)
-    #dertest()
-    #test_sigma()
-    #best_case_versus_worst(xe=0)
-    #TT_constraint()
+    for wp in np.arange(0, 201, 10):
+        fig3_ell_var(noise=wp)
+        fig6(num=n_theta*2-1, wp=wp)
+    fig3_ell_var(zre=zre, noise=0)
+    fig6(num=n_theta*2-1, wp=0)
+
     cartoons()
     n_realizations = 50000
-    #n_realizations = 50
     n_theta = 251
-    #n_theta = 25
 
-    #fig_mean_realizations(n_theta, n_realizations)
-    #fig_mean_realizations_tau(n_theta, n_realizations)
-    #fig_mean_realizations_tau_fixed(n_theta, n_realizations)
+    fig5(n_theta, n_realizations)
     n_realizations = 5000
     n_theta = 251
-    #print('2,9')
-    #fig3(zre=zre, lmin=2, lmax=9, ntests=0)
-    #print('10,19')
-    #fig3(zre=zre, lmin=10, lmax=19, ntests=0)
-    #print('20,29')
-    #fig3(zre=zre, lmin=20, lmax=29, ntests=0)
-    #print('30,99')
-    #fig3(zre=zre, lmin=30, lmax=99, ntests=0)
-    #print('2,99')
-    #fig3(zre=zre, lmin=2, lmax=99, ntests=0)
+
+    print('2,9')
+    fig3(zre=zre, lmin=2, lmax=9, ntests=0)
+    print('10,19')
+    fig3(zre=zre, lmin=10, lmax=19, ntests=0)
+    print('20,29')
+    fig3(zre=zre, lmin=20, lmax=29, ntests=0)
+    print('30,99')
+    fig3(zre=zre, lmin=30, lmax=99, ntests=0)
+    print('2,99')
+    fig3(zre=zre, lmin=2, lmax=99, ntests=0)
 
     #print('2,9')
     #fig3_taus(zre=zre, lmin=2, lmax=9, ntests=0)
