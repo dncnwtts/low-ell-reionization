@@ -137,64 +137,135 @@ def cartoons(tau=0.06):
 
 
     fontsize = 12
-    z, xe, ell, EE, TE = get_spectra(6, 0.2, both=True)
+    z, xe, ell, EE, TE = get_spectra(7.5, 0.2, both=True)
 
-    plt.plot(z, xe, color='k')
-    plt.xlabel(r'$z$')
-    plt.ylabel(r'$x_e(z)$')
+    #fig, (ax0, ax1) = plt.subplots(nrows=2, figsize=(4,5))
+    fig0, ax0 = plt.subplots(1)
+    ax0.plot(z, xe, color='k')
+    ax0.set_xlabel(r'$z$')
+    ax0.set_ylabel(r'$x_e(z)$')
 
-    plt.annotate(r'$\boldsymbol{z_\mathrm{re}}$',
-            xy=(6, 0.6), xytext=(6,-0.1), ha='center', va='center',
+    ax0.annotate(r'$\boldsymbol{z_\mathrm{re}}$',
+            xy=(7.5, 0.6), xytext=(7.5,-0.15), ha='center', va='center',
             arrowprops=dict(facecolor='C2',edgecolor='C2',
                 arrowstyle="-|>", shrinkA=0.05, lw=2),
             color='C2', fontsize=fontsize)
 
-    plt.text(14, 0.08, r'$\boldsymbol{x_e^\mathrm{min}}$', va='center',
+    ax0.text(14, 0.08, r'$\boldsymbol{x_e^\mathrm{min}}$', va='center',
     color='C0', fontsize=fontsize)
-    plt.annotate('', xy=(19, 0.2), xytext=(19,0), \
+    ax0.annotate('', xy=(19, 0.2), xytext=(19,0), \
             arrowprops=dict(facecolor='C0',edgecolor='C0',
                 arrowstyle="<|-|>", shrinkA=0.05,
                 shrinkB=0.05, lw=2),
             fontsize=fontsize)
 
 
-    plt.text(31, 0.08, r'$\boldsymbol{\delta z_\mathrm{re}}$', ha='center', va='center',
+    ax0.text(25.5, 0.1-0.02, r'$\boldsymbol{\delta z_\mathrm{re}}$', ha='center', va='center',
             color='C8', fontsize=fontsize)
-    plt.annotate('', xy=(27, 0.1), xytext=(29,0.1), \
+    ax0.annotate('', xy=(27, 0.1), xytext=(29,0.1), \
             arrowprops=dict(facecolor='C8',edgecolor='C8',
                 arrowstyle="<|-|>", shrinkA=0.05,
                 shrinkB=0.05, mutation_scale=5),
             fontsize=fontsize)
 
-    plt.text(9, 0.8-0.02, r'$\boldsymbol{\delta z_\mathrm{re}}$', ha='center',
+    ax0.text(5, 0.7-0.02, r'$\boldsymbol{\delta z_\mathrm{re}}$', ha='center',
             color='C8', va='center', fontsize=fontsize)
-    plt.annotate('', xy=(5, 0.8), xytext=(7,0.8), \
+    ax0.annotate('', xy=(6.5, 0.7), xytext=(8.5,0.7), \
             arrowprops=dict(facecolor='C8',edgecolor='C8',
                 arrowstyle="<|-|>", shrinkA=0.01,
                 shrinkB=0.01, mutation_scale=5),
             fontsize=fontsize)
 
-    plt.annotate(r'$\boldsymbol{z_\mathrm t}$',
-            xy=(28, 0.1), xytext=(28,-0.1), ha='center', va='center',
+    ax0.annotate(r'$\boldsymbol{z_\mathrm t}$',
+            xy=(28, 0.1), xytext=(28,-0.15), ha='center', va='center',
             arrowprops=dict(facecolor='C3',edgecolor='C3',
                 arrowstyle="-|>", shrinkA=0.05, lw=2),
             color='C3', fontsize=fontsize)
 
 
-    plt.xlim([0, 35])
-    plt.ylim([0, 1.3])
+    ax0.set_xlim([0, 35])
+    ax0.set_ylim([0, 1.3])
 
-    plt.xticks([],[])
+    ax0.set_xticks([],[])
     #plt.yticks([],[])
-    plt.yticks([0, 0.5, 1], [0, 0.5, 1])
-    ax = plt.gca()
-    ax.yaxis.set_minor_locator(AutoMinorLocator(5))
+    ax0.set_yticks([0, 0.5, 1], [0, 0.5, 1])
+    ax0.yaxis.set_minor_locator(AutoMinorLocator(5))
     #ax.spines['right'].set_visible(False)
     #ax.spines['top'].set_visible(False)
 
+    #plt.subplots_adjust(hspace=0.2)
 
-    plt.savefig('cartoon2.pdf', bbox_inches='tight')
-    plt.savefig('cartoon2.png', bbox_inches='tight')
+
+    fig0.savefig('cartoon2.pdf', bbox_inches='tight')
+    fig0.savefig('cartoon2.png', bbox_inches='tight')
+
+
+    import pandas
+    names=['z_l', 'z', 'z_u', 'xe_l', 'x_e', 'xe_u', 'technique', 'ref']
+    dtype = dict()
+    for i in range(6):
+        dtype[names[i]] = np.float32
+    for i in range(6,8):
+        dtype[names[i]] = str
+    d = pandas.read_csv('direct_observations.csv', header=1, names=names,
+                       dtype=dtype, verbose=True, skipinitialspace=True)
+    
+    d = d.sort_values(['technique', 'z'])
+    
+    i1 = ~np.isnan(d['xe_l']) & ~np.isnan(d['x_e']) & ~np.isnan(d['z'])
+    i2 = np.isnan(d['x_e']) & ~np.isnan(d['xe_u']) & ~np.isnan(d['z'])
+    i3 = np.isnan(d['x_e']) & ~np.isnan(d['xe_l'])
+    i4 = np.isnan(d['x_e']) & ~np.isnan(d['xe_u']) & np.isnan(d['z'])
+    i5 = ~np.isnan(d['xe_l']) & ~np.isnan(d['x_e']) & np.isnan(d['z'])
+    #d.loc[d['xe_l'] is np.nan]
+    d1 = d[i1]
+    d2 = d[i2]
+    d3 = d[i3]
+    d4 = d[i4]
+    d5 = d[i5]
+    alpha = 1
+
+    #fig1, ax1 = plt.subplots(1)
+    z, xe, ell, EE, TE = get_spectra(6.75, 0.05, both=True)
+    ax1 = ax0.inset_axes([0.45, 0.45, 0.55, 0.55], facecolor='0.9')
+
+    f = ax1.figure
+    f.set_facecolor('0.9')
+    b = ax0.transData.inverted().transform(ax1.get_tightbbox(fig0.canvas.get_renderer()))
+    ax0.add_patch(mpl.patches.Rectangle( (0.95*b[0][0], 0.95*b[0][1]), 
+        b[1][0]-0.95*b[0][0], b[1][1]-0.95*b[0][1], facecolor='0.9', edgecolor='0.8'))
+
+    ax1.xaxis.set_minor_locator(AutoMinorLocator(5))
+    ms = 5
+    lw = 1
+    ax1.errorbar(d1['z'], 1.08*d1['x_e'], 
+            xerr=[1.08*d1['z_l'], 1.08*d1['z_u']],
+            yerr=[1.08*d1['xe_l'], 1.08*d1['xe_u']], 
+            fmt='.', color='C0', zorder=6, ms=ms, elinewidth=lw)
+    ax1.errorbar(d2['z'], 1.08*d2['xe_u'], yerr=0.2, uplims=True,
+            fmt='.', color='C1', alpha=alpha, ms=ms, elinewidth=lw)
+    ax1.errorbar(d3['z'], 1.08*d3['xe_l'], yerr=0.2, lolims=True,
+            fmt='.', color='C2', alpha=alpha, ms=ms, elinewidth=lw)
+    ax1.errorbar((d4['z_l']+d4['z_u'])/2, 1.08*d4['xe_u'], xerr=(d4['z_l']-d4['z_u'])/2, 
+                 yerr=0.2, uplims=True, fmt='.', color='C1',
+                 alpha=alpha, ms=ms, elinewidth=lw)
+    ax1.errorbar((d5['z_l']+d5['z_u'])/2, 1.08*d5['x_e'], xerr=(d5['z_l']-d5['z_u'])/2,
+                yerr = [1.08*d5['xe_l'], 1.08*d5['xe_u']], fmt='.', color='C0',
+                ms=ms, elinewidth=lw)
+
+
+    ax1.set_yticks([0, 0.5, 1], [0, 0.5, 1])
+    ax1.yaxis.set_minor_locator(AutoMinorLocator(5))
+
+    ax1.plot(z, xe, color='k', zorder=-5)
+    #ax1.set_xlabel(r'$z$')
+    #ax1.set_ylabel(r'$x_e(z)$')
+
+    ax1.set_xlim([5.1, 8.2])
+    ax1.set_ylim([0, 1.3])
+
+    fig0.savefig('cartoon2.5.pdf', bbox_inches='tight')
+    fig0.savefig('cartoon2.5.png', bbox_inches='tight')
 
 
 
@@ -2221,7 +2292,7 @@ def fig6(num=50, lmax=40, wp=0):
     z0 = 6
     xe0 = 0
     cm1 = plt.cm.magma
-    cm2 = plt.cm.plasma
+    cm2 = plt.cm.copper
 
     ell, EE, TE, TT = get_spectra(z0, xe0, lmax=lmax, spectra=True, all_spectra=True)
     Clhat = np.array([TT, EE+N_ell, EE*0, TE, EE*0, EE*0])
@@ -2304,7 +2375,7 @@ def fig6(num=50, lmax=40, wp=0):
     ax.set_ylabel(r'$\chi^2_\mathrm{eff,\ell}$')
     plt.title('${0}\ \mathrm{{\mu K\,arcmin}}$'.format(wp), ha='right')
     if wp == 0: print(ax.get_ylim())
-    ax.set_ylim((-0.8351591093058617, 17.538341295423095))
+    ax.set_ylim((0, 17.538341295423095))
     fig.savefig(f'f6a_EE_{wp}.pdf', bbox_inches='tight')
     fig.savefig(f'f6a_EE_{wp}.png', bbox_inches='tight')
     plt.close()
@@ -2325,7 +2396,7 @@ def fig6(num=50, lmax=40, wp=0):
     ax.set_ylabel(r'$\chi^2_\mathrm{eff,\ell}$')
     plt.title('${0}\ \mathrm{{\mu K\,arcmin}}$'.format(wp), ha='right')
     if wp == 0: print(ax.get_ylim())
-    ax.set_ylim((-0.5303506396937818, 11.13736343356942))
+    ax.set_ylim((0, 11.13736343356942))
     fig.savefig(f'f6b_EE_{wp}.pdf', bbox_inches='tight')
     fig.savefig(f'f6b_EE_{wp}.png', bbox_inches='tight')
     plt.close()
@@ -2348,7 +2419,7 @@ def fig6(num=50, lmax=40, wp=0):
     ax.set_ylabel(r'$\chi^2_\mathrm{eff,\ell}$')
     plt.title('${0}\ \mathrm{{\mu K\,arcmin}}$'.format(wp), ha='right')
     if wp == 0: print(ax.get_ylim())
-    ax.set_ylim((-0.18301530897497395, 2.7800844991679634))
+    ax.set_ylim((0, 2.7800844991679634))
     fig.savefig(f'f6a_TE_{wp}.pdf', bbox_inches='tight')
     fig.savefig(f'f6a_TE_{wp}.png', bbox_inches='tight')
     plt.close()
@@ -2369,7 +2440,7 @@ def fig6(num=50, lmax=40, wp=0):
     ax.set_ylabel(r'$\chi^2_\mathrm{eff,\ell}$')
     plt.title('${0}\ \mathrm{{\mu K\,arcmin}}$'.format(wp), ha='right')
     if wp == 0: print(ax.get_ylim())
-    ax.set_ylim((-0.11140048822086523, 1.7899325064530514))
+    ax.set_ylim((0, 1.7899325064530514))
     fig.savefig(f'f6b_TE_{wp}.pdf', bbox_inches='tight')
     fig.savefig(f'f6b_TE_{wp}.png', bbox_inches='tight')
     plt.close()
@@ -2801,7 +2872,7 @@ if __name__ == '__main__':
     #fig1(num=n_theta)
     #fig1_big(num=n_theta)
     #fig1_transp(num=n_theta)
-    #fig1_alt2(num=n_theta)
+    #fig1_alt(num=n_theta)
     #fig2(num=n_theta, n_noises=nnoise)
     #fig2_alt(num=n_theta, n_noises=nnoise)
     #fig2_wrong(num=n_theta, n_noises=nnoise)
@@ -2819,7 +2890,7 @@ if __name__ == '__main__':
     #   fig4_alt(num=n_theta, n_noises=nnoise)
     #fig5(num=n_theta)
     #fig5_alt(num=n_theta)
-    #for wp in np.arange(0, 201, 1):
+    #for wp in np.arange(0, 201, 10):
     #    fig3_ell_var(noise=wp)
     #    fig6(num=n_theta*2-1, wp=wp)
     #fig3_ell_var(zre=zre, noise=0)
@@ -2830,7 +2901,7 @@ if __name__ == '__main__':
     #test_sigma()
     #best_case_versus_worst(xe=0)
     #TT_constraint()
-    #cartoons()
+    cartoons()
     n_realizations = 50000
     #n_realizations = 50
     n_theta = 251
@@ -2852,13 +2923,13 @@ if __name__ == '__main__':
     #print('2,99')
     #fig3(zre=zre, lmin=2, lmax=99, ntests=0)
 
-    print('2,9')
-    fig3_taus(zre=zre, lmin=2, lmax=9, ntests=0)
-    print('10,19')
-    fig3_taus(zre=zre, lmin=10, lmax=19, ntests=0)
-    print('20,29')
-    fig3_taus(zre=zre, lmin=20, lmax=29, ntests=0)
-    print('30,99')
-    fig3_taus(zre=zre, lmin=30, lmax=99, ntests=0)
-    print('2,99')
-    fig3_taus(zre=zre, lmin=2, lmax=99, ntests=0)
+    #print('2,9')
+    #fig3_taus(zre=zre, lmin=2, lmax=9, ntests=0)
+    #print('10,19')
+    #fig3_taus(zre=zre, lmin=10, lmax=19, ntests=0)
+    #print('20,29')
+    #fig3_taus(zre=zre, lmin=20, lmax=29, ntests=0)
+    #print('30,99')
+    #fig3_taus(zre=zre, lmin=30, lmax=99, ntests=0)
+    #print('2,99')
+    #fig3_taus(zre=zre, lmin=2, lmax=99, ntests=0)
