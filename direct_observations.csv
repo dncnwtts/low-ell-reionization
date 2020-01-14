@@ -1,0 +1,25 @@
+zll,zmid,zul,xell,xemid,xeul,technique,reference
+NaN,    5.03,   NaN,    0.0000165,  0.999945,   0.0000142,  Gunn-Peterson Optical Depth,                    \citet{Fan2006}
+NaN,    5.25,   NaN,    0.0000244,  0.999933,   0.0000207,  Gunn-Peterson Optical Depth,                    \citet{Fan2006}
+NaN,    5.45,   NaN,    0.0000301,  0.999934,   0.0000247,  Gunn-Peterson Optical Depth,                    \citet{Fan2006}
+NaN,    5.65,   NaN,    0.0000460,  0.999912,   0.0000408,  Gunn-Peterson Optical Depth,                    \citet{Fan2006}
+NaN,    5.85,   NaN,    NaN,        NaN,        0.99987,    Gunn-Peterson Optical Depth,                    \citet{Fan2006}
+NaN,    6.10,   NaN,    NaN,        NaN,        0.99957,    Gunn-Peterson Optical Depth,                    \citet{Fan2006}
+NaN,    5.9,    NaN,    0.89,       NaN,        NaN,        Dark Gaps in Quasar Spectra,                    \citet{McGreer2015}
+NaN,    5.6,    NaN,    0.91,       NaN,        NaN,        Dark Gaps in Quasar Spectra,                    \citet{McGreer2015}
+6.24,   NaN,    6.42,   NaN,        NaN,        0.9,        Ly$\alpha$ Damping Wing of Quasars,             \citet{Schroeder2013}
+NaN,    6.3,    NaN,    0.4,        NaN,        NaN,        Ly$\alpha$ Damping Wing of a GRB,               \citet{Totani2006}\citet{McQuinn2008}
+NaN,    6.6,    NaN,    0.5,       NaN,         NaN,        Galaxy Clustering,                              \citet{McQuinn2007}\citet{Ouchi2010}
+NaN,    7.8,    NaN,    NaN,        0.5,        NaN,        Prevalence of Ly$\alpha$ Emission in Galaxies,  \citet{Caruana2014}
+6.844,    NaN,    7.213,    0.1,        NaN,        0.4,        Prevalence of Ly$\alpha$ Emission in Galaxies,  \citet{Ono2012}
+6.31,    7.0,    6.740,    NaN,        NaN,        0.49,       Prevalence of Ly$\alpha$ Emission in Galaxies,  \citet{Pentericci2014}
+7,    NaN,    8.2,    NaN,        NaN,        0.70,       Prevalence of Ly$\alpha$ Emission in Galaxies,  \citet{Tilvi2014}
+NaN,    7.09,   NaN,    0.26,       0.48,       0.26,       Ly$\alpha$ Damping Wing of Quasar,             \citet{Davies2018}
+NaN,    7.54,   NaN,    0.23,       0.60,       0.20,       Ly$\alpha$ Damping Wing of Quasar,             \citet{Davies2018}
+NaN,    7.5,    NaN,    0.19,       0.21,       0.17,       Ly$\alpha$ Damping Wing of Quasar,             \citet{Greig2019}
+7,    NaN,   8,    0.09,       0.61,       0.08,       Ly$\alpha$-Emitter LFs,                         \citet{Schenker2014}
+0.6,    7.9,    0.6,    NaN,        NaN,        0.54,       Ly$\alpha$ Equivalent Width Distribution,       \citet{Mason2019}
+0.25,    7,      0.25,    0.15,       0.41,       0.11,       Ly$\alpha$ Line Profiles,                       \citet{Mason2018}
+NaN,    7.1,    NaN,    NaN,        NaN,        0.9,        Near-zone Quasar,                               \citet{Mortlock2011}\citet{Bolton2011}
+NaN,    7.54,   NaN,    0.18,       0.44,       0.21,       Ly$\alpha$ Damping Wing of Quasar,             \citet{banados}
+NaN,    7.08,   NaN,    0.19,       0.6,        0.21,       Ly$\alpha$ Damping Wing of Quasar,              \citet{Greig2017}

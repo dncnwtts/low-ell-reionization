@@ -1,11 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+
 mpl.rcParams['figure.figsize'] = (4,3)
 mpl.rcParams['figure.dpi'] = 300
 
 from matplotlib.ticker import (FormatStrFormatter, AutoMinorLocator)
-
 from scipy.optimize import curve_fit
 from scipy.integrate import trapz
 from scipy.interpolate import interp1d
@@ -25,10 +25,6 @@ from tools import (twinplot, get_tau, get_tau_z, get_twotau, get_spectra,
         get_F_ell, get_F_ell_forcezsplit, get_F_ell_2, get_F_ell_3,
         get_F_ell_4, get_F_ell_5, get_F_ell_tau, get_spectra_simple,
         get_F_ell_3_tau)
-
-from classtools.users.djw.tools import (med_subtract, spice_wrap, bin_spectra,
-        bin_noisy_spectra, twinx_whitenoise, read_classmap,
-        get_TT, get_TE, get_EE, rotate_map, alpha)
 
 lmax = 30
 
@@ -418,451 +414,23 @@ def fig1_transp(num=50):
 
     return
 
-def fig2_1(num=50, n_noises=30):
-    '''
-    z_re constraints only, EE and Wishart.
-
-    alphas increase as noise decreases
-    C0 for Wishart, C1 for EE only.
-    '''
-    zres = np.linspace(6, 10, num)
-    wps = np.logspace(0, np.log10(200), n_noises) 
-    N_lEEs = (wps*np.pi/180/60)**2
-
-    fig, axes = plt.subplots(nrows=1, ncols=2, 
-                             gridspec_kw={"width_ratios":[1,0.05], "wspace":0.1})
-    ax = axes[0]
-    cax = axes[1]
-    sm = plt.cm.ScalarMappable(cmap=plt.cm.viridis,
-            norm=mpl.colors.LogNorm(vmin=wps.min(), vmax=wps.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$w_p^{-1/2}$ [$\mathrm{\mu K\,arcmin}$]')
-
-    lnPWs = []
-    for i, N_lEE in enumerate(N_lEEs):
-        print(i)
-        ell, EE, TE, TT = get_spectra(8, 0, lmax=lmax, spectra=True, all_spectra=True)
-        Clhat = np.array([TT, EE+N_lEE, EE*0, TE, EE*0, EE*0])
-        lnPE = []
-        lnPW = []
-        for zre in zres:
-            lnPE.append(lnprob_EE_ell(zre, 0, Clhat[1], N_l=N_lEE))
-            lnPW.append(lnprob_wish_ell(zre, 0, Clhat, N_lT=0, N_lE=N_lEE))
-        ax.plot(zres, np.exp(np.sum(lnPW, axis=1)),
-                color=plt.cm.viridis(i/len(N_lEEs)), zorder=1/N_lEE)
-        #ax.plot(zres, np.exp(np.sum(lnPW, axis=1)), color='C0',
-        #        alpha=1-i/len(N_lEEs))
-        #ax.plot(zres, np.exp(np.sum(lnPE, axis=1)), color='C1',
-        #        alpha=1-i/len(N_lEEs))
-        # lnPW is an array of length len(zres), 11.
-        lnPWs.append(np.exp(np.sum(lnPW, axis=1)))
-    lnPWs = np.array(lnPWs)
-    print(lnPWs.shape)
-    print(zres.shape)
-    bla = np.vstack((zres, lnPWs))
-    np.save('z_lnL', bla)
-    ax.set_ylim([-0.05, 1.05])
-    ax.set_xlabel(r'$z_\mathrm{re}$')
-    ax.set_ylabel(r'$P(z_\mathrm{re}|x_e^\mathrm{min}=0,\{\hat{\boldsymbol C}_\ell\})$')
-    fig.savefig('f2.pdf', bbox_inches='tight')
-    fig.savefig('f2.png', bbox_inches='tight')
-    plt.close('all')
-    return
-
-def fig2_2(num=50, n_noises=30):
-    '''
-    z_re constraints only, EE and Wishart. What do I want this plot to look
-    like? How about N_l^TT = 0, crank up N_l^EE.
-
-    alphas increase as noise decreases
-    C0 for Wishart, C1 for EE only.
-    '''
-    zres = np.linspace(6, 10, num)
-    wps = np.logspace(0, np.log10(2000), n_noises) 
-    N_lEEs = (wps*np.pi/180/60)**2
-
-    fig, axes = plt.subplots(nrows=1, ncols=2, 
-                             gridspec_kw={"width_ratios":[1,0.05], "wspace":0.1})
-    ax = axes[0]
-    cax = axes[1]
-    sm = plt.cm.ScalarMappable(cmap=plt.cm.viridis,
-            norm=mpl.colors.LogNorm(vmin=wps.min(), vmax=wps.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$w_p^{-1/2}$ [$\mathrm{\mu K\,arcmin}$]')
-
-    lnPWs = []
-    for i, N_lEE in enumerate(N_lEEs):
-        print(i)
-        ell, EE, TE, TT = get_spectra(8, 0, lmax=lmax, spectra=True, all_spectra=True)
-        Clhat = np.array([TT, EE+N_lEE, EE*0, TE, EE*0, EE*0])
-        lnPE = []
-        lnPW = []
-        for zre in zres:
-            lnPE.append(lnprob_EE_ell(zre, 0, Clhat[1], N_l=N_lEE))
-            lnPW.append(lnprob_wish_ell(zre, 0, Clhat, N_lT=0, N_lE=N_lEE))
-        ax.plot(zres, np.exp(np.sum(lnPW, axis=1)),
-                color=plt.cm.viridis(i/len(N_lEEs)), zorder=1/N_lEE)
-        #ax.plot(zres, np.exp(np.sum(lnPW, axis=1)), color='C0',
-        #        alpha=1-i/len(N_lEEs))
-        #ax.plot(zres, np.exp(np.sum(lnPE, axis=1)), color='C1',
-        #        alpha=1-i/len(N_lEEs))
-        # lnPW is an array of length len(zres), 11.
-        lnPWs.append(np.exp(np.sum(lnPW, axis=1)))
-    lnPWs = np.array(lnPWs)
-    print(lnPWs.shape)
-    print(zres.shape)
-    bla = np.vstack((zres, lnPWs))
-    np.save('z_lnL', bla)
-    ax.set_ylim([-0.05, 1.05])
-    ax.set_xlabel(r'$z_\mathrm{re}$')
-    ax.set_ylabel(r'$P(z_\mathrm{re}|x_e^\mathrm{min}=0,\{\hat{\boldsymbol C}_\ell\})$')
-    fig.savefig('f2.pdf', bbox_inches='tight')
-    fig.savefig('f2.png', bbox_inches='tight')
-    plt.close('all')
-    return
-
-def fig1_alt2(num=50):
-    lw = 1
-    ymin = 3.2e-5
-    ymax = 1.2e-1
-
-    zs = np.linspace(6, 10, num)
-    xes = np.linspace(0, 0.2, num)
-    z0 = 6
-    xe0 = 0
-    
-    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(9,3), 
-                             gridspec_kw={"width_ratios":[1,1,0.05], "wspace":0.6})
-    ax1 = axes[0]
-    ax2 = axes[1]
-    cax = axes[2]
-    axs2 = [ax2, ax2.twinx()]
-    for i in range(len(zs))[::-1]:
-        z, xe, ell, EE, TE = get_spectra(zs[i], xe0, both=True)
-        thermo = get_spectra(zs[i], xe0, therm=True)
-        ax1.plot(z, xe, color=plt.cm.magma(i/len(zs)), lw=lw)
-        ax1.set_xlim([0, 40])
-        ax1.set_xlabel(r'$z$')
-        ax1.set_ylabel(r'$x_e$')
-        twinplot(ell, TE, linestyle='-', marker=None, color=plt.cm.magma(i/len(zs)), 
-                 axes=axs2, spec='TE', lw=lw, ymin=5.5e-3, ymax=5.5,
-                 ylabels_r=True)
-    sm = plt.cm.ScalarMappable(cmap=plt.cm.magma, norm=plt.Normalize(vmin=zs.min(), vmax=zs.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$z_\mathrm{re}$')
-    
-    plt.tight_layout()
-    plt.savefig('f1_zre_alt_TE.pdf', bbox_inches='tight')
-    plt.savefig('f1_zre_alt_TE.png', bbox_inches='tight')
-    plt.close('all')
-    
-        
-    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(9, 3), 
-                             gridspec_kw={"width_ratios":[1,1,0.05], "wspace":0.6})
-    ax1 = axes[0]
-    ax2 = axes[1]
-    cax = axes[2]
-    axs2 = [ax2, ax2.twinx()]
-    for i in range(len(zs))[::-1]:
-        z, xe, ell, EE, TE = get_spectra(z0, xes[i], both=True)
-        thermo = get_spectra(z0, xes[i], therm=True)
-        _, taulo, tauhi = get_twotau(thermo, zmax=100, xmin=2e-4)
-    
-        ax1.plot(z, xe, color=plt.cm.plasma(i/len(zs)), lw=lw)
-        ax1.set_xlim([0, 40])
-        ax1.set_xlabel(r'$z$')
-        ax1.set_ylabel(r'$x_e$')
-        twinplot(ell, TE, linestyle='-', marker=None, color=plt.cm.magma(i/len(zs)), 
-                 axes=axs2, spec='TE', lw=lw, ymin=5.5e-3, ymax=5.5,
-                 ylabels_r=True)
-    sm = plt.cm.ScalarMappable(cmap=plt.cm.plasma, norm=plt.Normalize(vmin=xes.min(), vmax=xes.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$x_e^\mathrm{min}$', ticks=[0, 0.1, 0.2])
-    
-    #plt.tight_layout()
-    plt.savefig('f1_xmin_alt_TE.pdf', bbox_inches='tight')
-    plt.savefig('f1_xmin_alt_TE.png', bbox_inches='tight')
-    plt.close('all')
-    
-    
-    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(9, 3), 
-                             gridspec_kw={"width_ratios":[1,1,0.05], "wspace":0.6})
-    ax1 = axes[0]
-    ax2 = axes[1]
-    cax = axes[2]
-    axs2 = [ax2, ax2.twinx()]
-    dzs = np.linspace(0.5, 10, len(xes))
-    #z0 = 8
-    for i in range(len(dzs))[::-1]:
-        #z, xe, ell, EE, TE = get_spectra(z0, xe0, dz=dzs[i], both=True,
-                #zstartmax=200)
-        z, xe, ell, EE, TE = get_spectra_simple(z0, xe0, dz=dzs[i], both=True,
-                zstartmax=200)
-        #thermo = get_spectra(z0, xe0, dz=dzs[i], therm=True)
-        #_, taulo, tauhi = get_twotau(thermo, zmax=100, xmin=2e-4)
-    
-        ax1.plot(z, xe, color=plt.cm.inferno(i/len(dzs)),lw=lw)
-        ax1.set_xlim([0, 40])
-        ax1.set_xlabel(r'$z$')
-        ax1.set_ylabel(r'$x_e$')
-        twinplot(ell, TE, linestyle='-', marker=None, color=plt.cm.magma(i/len(zs)), 
-                 axes=axs2, spec='TE', lw=lw, ymin=5.5e-3, ymax=5.5,
-                 ylabels_r=True)
-    sm = plt.cm.ScalarMappable(cmap=plt.cm.inferno, norm=plt.Normalize(vmin=dzs.min(), vmax=dzs.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$\delta z_\mathrm{re}$')
-    #plt.tight_layout()
-    plt.savefig('f1_dz_alt_TE.pdf', bbox_inches='tight')
-    plt.savefig('f1_dz_alt_TE.png', bbox_inches='tight')
-    plt.close('all')
-
-    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(9, 3), 
-                             gridspec_kw={"width_ratios":[1,1,0.05], "wspace":0.6})
-    ax1 = axes[0]
-    ax2 = axes[1]
-    cax = axes[2]
-    axs2 = [ax2, ax2.twinx()]
-    dzs = np.linspace(0.5, 10, len(xes))
-    zts = np.linspace(20, 35, len(xes))
-    #z0 = 8
-    for i in range(len(zts))[::-1]:
-        #z, xe, ell, EE, TE = get_spectra(z0, xe0, dz=dzs[i], both=True,
-                #zstartmax=200)
-        z, xe, ell, EE, TE = get_spectra(z0, 0.1, z_t=zts[i], both=True,
-                zstartmax=200)
-        #thermo = get_spectra(z0, xe0, dz=dzs[i], therm=True)
-        #_, taulo, tauhi = get_twotau(thermo, zmax=100, xmin=2e-4)
-    
-        ax1.plot(z, xe, color=plt.cm.cividis(i/len(dzs)),lw=lw)
-        twinplot(ell, TE, linestyle='-', marker=None, color=plt.cm.magma(i/len(zs)), 
-                 axes=axs2, spec='TE', lw=lw, ymin=5.5e-3, ymax=5.5,
-                 ylabels_r=True)
-
-    ax1.set_xlim([0, 40])
-    ax1.minorticks_on()
-    ax1.set_xlabel(r'$z$')
-    ax1.set_ylabel(r'$x_e$')
-    ax2.set_title(r'$C_\ell^\mathrm{EE}$')
-    sm = plt.cm.ScalarMappable(cmap=plt.cm.cividis, norm=plt.Normalize(vmin=zts.min(), vmax=zts.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$z_\mathrm t$')
-    #plt.tight_layout()
-    plt.savefig('f1_zt_alt_TE.pdf', bbox_inches='tight')
-    plt.savefig('f1_zt_alt_TE.png', bbox_inches='tight')
-    plt.close('all')
-    return
-
-def fig2_3(num=50, n_noises=30):
-    '''
-    z_re constraints only, EE and Wishart. What do I want this plot to look
-    like? How about N_l^TT = 0, crank up N_l^EE.
-
-    alphas increase as noise decreases
-    C0 for Wishart, C1 for EE only.
-    '''
-    zres = np.linspace(6, 10, num)
-    wps = np.logspace(0, np.log10(200), n_noises) 
-    N_lEEs = (wps*np.pi/180/60)**2
-
-    fig, axes = plt.subplots(nrows=1, ncols=2, 
-                             gridspec_kw={"width_ratios":[1,0.05], "wspace":0.1})
-    ax = axes[0]
-    cax = axes[1]
-    sm = plt.cm.ScalarMappable(cmap=plt.cm.viridis,
-            norm=mpl.colors.LogNorm(vmin=wps.min(), vmax=wps.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$w_p^{-1/2}$ [$\mathrm{\mu K\,arcmin}$]')
-
-    lnPWs = []
-    for i, N_lEE in enumerate(N_lEEs):
-        print(i)
-        ell, EE, TE, TT = get_spectra(8, 0, lmax=lmax, spectra=True, all_spectra=True)
-        Clhat = np.array([TT, EE+N_lEE, EE*0, TE, EE*0, EE*0])
-        lnPE = []
-        lnPW = []
-        for zre in zres:
-            lnPE.append(lnprob_EE_ell(zre, 0, Clhat[1], N_l=N_lEE))
-            lnPW.append(lnprob_wish_ell(zre, 0, Clhat, N_lT=0, N_lE=N_lEE))
-        ax.plot(zres, np.exp(np.sum(lnPW, axis=1)),
-                color=plt.cm.viridis(i/len(N_lEEs)), zorder=1/N_lEE)
-        #ax.plot(zres, np.exp(np.sum(lnPW, axis=1)), color='C0',
-        #        alpha=1-i/len(N_lEEs))
-        #ax.plot(zres, np.exp(np.sum(lnPE, axis=1)), color='C1',
-        #        alpha=1-i/len(N_lEEs))
-        # lnPW is an array of length len(zres), 11.
-        lnPWs.append(np.exp(np.sum(lnPW, axis=1)))
-    lnPWs = np.array(lnPWs)
-    print(lnPWs.shape)
-    print(zres.shape)
-    bla = np.vstack((zres, lnPWs))
-    np.save('z_lnL', bla)
-    ax.set_ylim([-0.05, 1.05])
-    ax.set_xlabel(r'$z_\mathrm{re}$')
-    ax.set_ylabel(r'$P(z_\mathrm{re}|x_e^\mathrm{min}=0,\{\hat{\boldsymbol C}_\ell\})$')
-    fig.savefig('f2.pdf', bbox_inches='tight')
-    fig.savefig('f2.png', bbox_inches='tight')
-    plt.close('all')
-    return
-
-def fig2_alt(num=50, n_noises=30):
-    '''
-    same as fig2, but for tau.
-    '''
-    zres = np.linspace(4, 24, num)
-    wps = np.logspace(1, np.log10(5e4), n_noises) 
-    N_lEEs = (wps*np.pi/180/60)**2
-
-    fig, axes = plt.subplots(nrows=1, ncols=2, 
-                             gridspec_kw={"width_ratios":[1,0.05], "wspace":0.1})
-    ax = axes[0]
-    cax = axes[1]
-    sm = plt.cm.ScalarMappable(cmap=plt.cm.viridis,
-            norm=mpl.colors.LogNorm(vmin=wps.min(), vmax=wps.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$w_p^{-1/2}$ [$\mathrm{\mu K\,arcmin}$]')
-
-    taus = []
-    lnPWs = []
-    for i, N_lEE in enumerate(N_lEEs):
-        print(i)
-        ell, EE, TE, TT = get_spectra(14, 0, lmax=lmax, spectra=True, all_spectra=True)
-        Clhat = np.array([TT, EE+N_lEE, EE*0, TE, EE*0, EE*0])
-        lnPE = []
-        lnPW = []
-        taus = []
-        for zre in zres:
-            lnPE.append(lnprob_EE_ell(zre, 0, Clhat[1], N_l=N_lEE))
-            lnPW.append(lnprob_wish_ell(zre, 0, Clhat, N_lT=0, N_lE=N_lEE))
-            zsplit, tau_lo, tau_hi = get_twotau(get_spectra(zre, 0, therm=True))
-            taus.append(tau_lo)
-        ax.plot(taus, np.exp(np.sum(lnPW, axis=1)),
-                color=plt.cm.viridis(i/len(N_lEEs)), zorder=1/N_lEE)
-        #ax.plot(zres, np.exp(np.sum(lnPW, axis=1)), color='C0',
-        #        alpha=1-i/len(N_lEEs))
-        #ax.plot(zres, np.exp(np.sum(lnPE, axis=1)), color='C1',
-        #        alpha=1-i/len(N_lEEs))
-        lnPWs.append(np.exp(np.sum(lnPW, axis=1)))
-    taus = np.array(taus)
-    lnPWs = np.array(lnPWs)
-    bla = np.vstack((taus, lnPWs))
-    np.save('tau_lnL', bla)
-    ax.set_ylim([-0.05, 1.05])
-    ax.set_xlabel(r'$\tau$')
-    ax.set_ylabel(r'$P(\tau|x_e^\mathrm{min}=0,\{\hat{\boldsymbol C}_\ell\})$')
-    fig.savefig('f2_alt.pdf', bbox_inches='tight')
-    fig.savefig('f2_alt.png', bbox_inches='tight')
-    plt.close('all')
-    return
-
-def fig2_wrong(num=50, n_noises=30):
-    '''
-    same as fig2, but for tau.
-    '''
-    zres = np.linspace(6, 10, num)
-    wps = np.logspace(0, np.log10(200), n_noises) 
-    N_lEEs = (wps*np.pi/180/60)**2
-
-    fig, axes = plt.subplots(nrows=1, ncols=2, 
-                             gridspec_kw={"width_ratios":[1,0.05], "wspace":0.1})
-    ax = axes[0]
-    cax = axes[1]
-    sm = plt.cm.ScalarMappable(cmap=plt.cm.viridis,
-            norm=mpl.colors.LogNorm(vmin=wps.min(), vmax=wps.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$w_p^{-1/2}$ [$\mathrm{\mu K\,arcmin}$]')
-
-    taus = []
-    lnPWs = []
-    xe0 = 0.01
-    for i, N_lEE in enumerate(N_lEEs):
-        print(i)
-        ell, EE, TE, TT = get_spectra(8, xe0, lmax=lmax, spectra=True, all_spectra=True)
-        Clhat = np.array([TT, EE+N_lEE, EE*0, TE, EE*0, EE*0])
-        lnPE = []
-        lnPW = []
-        taus = []
-        for zre in zres:
-            lnPE.append(lnprob_EE_ell(zre, 0, Clhat[1], N_l=N_lEE))
-            lnPW.append(lnprob_wish_ell(zre, 0, Clhat, N_lT=0, N_lE=N_lEE))
-            zsplit, tau_lo, tau_hi = get_twotau(get_spectra(zre, 0, therm=True))
-            taus.append(tau_lo)
-        ax.plot(taus, np.exp(np.sum(lnPW, axis=1)),
-                color=plt.cm.viridis(i/len(N_lEEs)), zorder=1/N_lEE)
-        #ax.plot(zres, np.exp(np.sum(lnPW, axis=1)), color='C0',
-        #        alpha=1-i/len(N_lEEs))
-        #ax.plot(zres, np.exp(np.sum(lnPE, axis=1)), color='C1',
-        #        alpha=1-i/len(N_lEEs))
-        lnPWs.append(np.exp(np.sum(lnPW, axis=1)))
-    taus = np.array(taus)
-    lnPWs = np.array(lnPWs)
-    bla = np.vstack((taus, lnPWs))
-    np.save('tau_lnL_wrong', bla)
-    ax.set_ylim([-0.05, 1.05])
-    ax.set_xlabel(r'$\tau$')
-    ax.set_ylabel(r'$P(\tau|x_e^\mathrm{min}=0,\{\hat{\boldsymbol C}_\ell\})$')
-    fig.savefig('f2_wrong.pdf', bbox_inches='tight')
-    fig.savefig('f2_wrong.png', bbox_inches='tight')
-    plt.close('all')
-    return
-
 def fig3(zre=7, xe=0.05, lmin=2, lmax=100, ntests=2):
     '''
-    Contour plots
+    Plots Fisher contours as a function of xe and zre, shows contours
+    for noise levels of 0, 10, 60 and 100 uK-arcmin. 
+    Allows the multipole
+    range under consideration to be altered.
     '''
     F = []
-    wps = np.array([10, 20, 50, 100, 200, 500, 1000])
-    #wps = np.array([1e3, 5e3, 1e4, 5e4])
-    #wps = np.array([0, np.inf])
-    # 70 uK-arcmin corresponds to the projected white noise level and the
-    # reported one for 143 GHz, both in the blue book and in the final results.
-    # But 100 is a bit closer to the red  noise sensitivity...
-    wps = np.array([0, 10, 70])
-    wps = np.array([0, 10, 100, 200])
     wps = np.array([0, 10, 60, 100])
-    #wps = np.array([0, 10, 50, 200])
     plt.figure()
     ell = np.arange(lmin, lmax+1)
-    fig, axes = plt.subplots(3,1)
-    fig2, axes2 = plt.subplots(3,1)
-    fig3, axes3 = plt.subplots(3,1)
     for wp in wps:
-        #F.append(np.sum(get_F_ell(zre, xe,\
-        #    N_lT=(wp*np.pi/180/60)**2,\
-        #    N_lE=(wp*np.pi/180/60)**2),axis=0))
         F_ell, F_ell1d, dTTdx, dEEdx, dTEdx, dTTdz, dEEdz, dTEdz = get_F_ell(zre, xe,\
             N_lT=(0*np.pi/180/60)**2,\
             N_lE=(wp*np.pi/180/60)**2, lmin=lmin, lmax=lmax,
             test2=True, dzre=5e-5, dxre=1e-5)
         F_ell = np.array(F_ell)
-        axes[0].loglog(ell, abs(F_ell[:,0,0]))
-        axes[0].set_ylabel(r'$|F_{zz}|$')
-        axes[1].loglog(ell, abs(F_ell[:,1,0]))
-        axes[1].set_ylabel(r'$|F_{xz}|$')
-        axes[2].loglog(ell, abs(F_ell[:,1,1]))
-        axes[2].set_ylabel(r'$|F_{xx}|$')
-        axes[2].set_xlabel(r'$\ell$')
-
-        F.append(np.sum(F_ell,axis=0))
-        axes2[0].loglog(ell, abs(dTTdx))
-        axes2[0].set_ylabel(r'$\partial C_\ell^\mathrm{TT}/\partial x$')
-        axes2[1].loglog(ell, abs(dTEdx))
-        axes2[1].set_ylabel(r'$\partial C_\ell^\mathrm{TE}/\partial x$')
-        axes2[2].loglog(ell, abs(dEEdx))
-        axes2[2].set_ylabel(r'$\partial C_\ell^\mathrm{EE}/\partial x$')
-        axes2[2].set_xlabel(r'$\ell$')
-
-        axes3[0].loglog(ell, abs(dTTdz))
-        axes3[0].set_ylabel(r'$\partial C_\ell^\mathrm{TT}/\partial z$')
-        axes3[1].loglog(ell, abs(dTEdz))
-        axes3[1].set_ylabel(r'$\partial C_\ell^\mathrm{TE}/\partial z$')
-        axes3[2].loglog(ell, abs(dEEdz))
-        axes3[2].set_ylabel(r'$\partial C_\ell^\mathrm{EE}/\partial z$')
-        axes3[2].set_xlabel(r'$\ell$')
-
-    
-    fig.savefig('test1.pdf', bbox_inches='tight')
-    fig2.savefig('test2.pdf', bbox_inches='tight')
-    fig3.savefig('test3.pdf', bbox_inches='tight')
     plt.close('all')
 
 
@@ -877,8 +445,6 @@ def fig3(zre=7, xe=0.05, lmin=2, lmax=100, ntests=2):
         gausses.append(gauss)
 
     g = plots.getSubplotPlotter()
-    #print(colors, type(colors))
-    #colors = tuple(colors)
     colors = [r'C{0}'.format(i) for i in range(len(F))]
     g.triangle_plot(gausses[::-1], filled=True, colors=colors[::-1],
             contour_colors=colors[::-1], contour_lws=[1]*len(gausses))
@@ -900,9 +466,6 @@ def fig3(zre=7, xe=0.05, lmin=2, lmax=100, ntests=2):
     fig.axes[1].set_xlim(0, 0.175)
     fig.axes[2].set_ylim(0, 0.175)
     
-    #fig.axes[2].set_yticks([0.02, 0.04])
-    #fig.axes[2].set_xticks([0.06, 0.08])
-
     fig.axes[1].set_xticks([0.05, 0.10, 0.15])
     fig.axes[2].set_yticks([0.05, 0.10, 0.15])
 
@@ -912,83 +475,12 @@ def fig3(zre=7, xe=0.05, lmin=2, lmax=100, ntests=2):
     plt.close('all')
     return
 
-def fig3_rednoise(zre=8, xe=0.05, lmin=2, lmax=100, ntests=2):
-    '''
-    Contour plots
-    '''
-    F = []
-
-    l, NlD_P = np.loadtxt('planck_FFP8_spec.txt', delimiter=',').T
-
-    f = interp1d(l, NlD_P)
-    ell = np.arange(lmin, lmax+1)
-    D_l = f(ell)
-    Z = ell*(ell+1)/(2*np.pi)
-    N_ell = D_l / Z
-    N_ell = np.insert(N_ell, [0], [0,1])
-    print(N_ell.shape)
-    N_ells = [(0*np.pi/180/60)**2, (100*np.pi/180/60)**2, N_ell]
-
-    ell = np.arange(lmin, lmax+1)
-    fig, axes = plt.subplots(3,1)
-    fig2, axes2 = plt.subplots(3,1)
-    fig3, axes3 = plt.subplots(3,1)
-    for Nl in N_ells:
-        F_ell, F_ell1d, dTTdx, dEEdx, dTEdx, dTTdz, dEEdz, dTEdz = get_F_ell(zre, xe,\
-            N_lE=Nl, lmin=lmin, lmax=lmax,
-            test2=True, dzre=5e-5, dxre=1e-5)
-        F_ell = np.array(F_ell)
-        F.append(np.sum(F_ell,axis=0))
-
-    mean = np.array([zre, xe])
-    gausses = []
-    labels = ['Noiseless', r'$100\,\mathrm{\mu K\,arcmin}$', r'FFP8']
-    for i in range(len(F)):
-        cov = np.linalg.inv(F[i])
-        print(labels[i])
-        print(cov[0,0]**0.5, cov[1,1]**0.5)
-        gauss = GaussianND(mean, cov, labels=[r'$z_\mathrm{re}$', r'$x_e^\mathrm{min}$'],\
-            label=labels[i])
-        gausses.append(gauss)
-
-    g = plots.getSubplotPlotter()
-    colors = [r'C{0}'.format(i) for i in range(len(F))]
-    g.triangle_plot(gausses[::-1], filled=True, colors=colors[::-1],
-            contour_colors=colors[::-1], contour_lws=[1]*len(gausses))
-
-
-    fig = plt.gcf()
-    for ax in fig.axes[:2]:
-        ax.spines['right'].set_visible(False)
-        ax.spines['top'].set_visible(False)
-        ax.spines['left'].set_visible(False)
-        ax.set_yticks([])
-
-    fig.axes[0].set_xlim(5., 11)
-    fig.axes[2].set_xlim(5., 11)
-
-    fig.axes[0].set_xticks([6,8,10])
-    fig.axes[2].set_xticks([6,8,10])
-    
-    fig.axes[1].set_xlim(0, 0.18)
-    fig.axes[2].set_ylim(0, 0.18)
-    
-
-    fig.axes[1].set_xticks([0.05, 0.10, 0.15])
-    fig.axes[2].set_yticks([0.05, 0.10, 0.15])
-
-
-    plt.savefig(f'f3_rednoise_{lmin}_{lmax}.pdf', bbox_inches='tight')
-    plt.savefig(f'f3_rednoise_{lmin}_{lmax}.png', bbox_inches='tight')
-    plt.close('all')
-    return
-
 def fig3_ell_var(zre=7, xe=0.05, noise=0):
     '''
-    Contour plots
+    Plots Fisher contours as a function of xe and zre, shows contours
+    using separate multipole ranges.
     '''
     F = []
-    #pairs = [(30,99), (20, 29), (2, 9), (10, 19), (2, 99)][::-1]
     pairs = [(2,99), (2, 9), (10, 19), (20, 29), (30, 99)]
     colors = [r'C{0}'.format(i) for i in range(len(pairs))]
     for p in pairs:
@@ -1058,9 +550,6 @@ def fig3_ell_var(zre=7, xe=0.05, noise=0):
     fig.axes[1].set_xlim(0, 0.175)
     fig.axes[2].set_ylim(0, 0.175)
     
-    #fig.axes[2].set_yticks([0.02, 0.04])
-    #fig.axes[2].set_xticks([0.06, 0.08])
-
     fig.axes[1].set_xticks([0.05, 0.10, 0.15])
     fig.axes[2].set_yticks([0.05, 0.10, 0.15])
 
@@ -1072,28 +561,12 @@ def fig3_ell_var(zre=7, xe=0.05, noise=0):
     plt.close('all')
     return
 
-def swap(*line_list):
-    """
-    Example
-    -------
-    line = plot(linspace(0, 2, 10), rand(10))
-    swap(line)
-    """
-    for lines in line_list:
-        try:
-            iter(lines)
-        except:
-            lines = [lines]
-
-        for line in lines:
-            xdata, ydata = line.get_xdata(), line.get_ydata()
-            line.set_xdata(ydata)
-            line.set_ydata(xdata)
-            line.axes.autoscale_view()
-
 def fig3_taus(zre=7, xe=0.05, lmin=2, lmax=100, ntests=2):
     '''
-    Contour plots
+    Plots Fisher contours as a function of tau_lo and tau_hi, shows contours
+    for noise levels of 0, 10, 60 and 100 uK-arcmin. 
+    Allows the multipole
+    range under consideration to be altered.
     '''
     F = []
     wps = np.array([10, 20, 50, 100, 200, 500, 1000])
@@ -1147,12 +620,6 @@ def fig3_taus(zre=7, xe=0.05, lmin=2, lmax=100, ntests=2):
         ax.spines['top'].set_visible(False)
         ax.spines['left'].set_visible(False)
         ax.set_yticks([])
-    '''
-    fig.axes[2].spines['right'].set_visible(False)
-    fig.axes[2].spines['top'].set_visible(False)
-    fig.axes[2].yaxis.set_ticks_position('left')
-    fig.axes[2].xaxis.set_ticks_position('bottom')
-    '''
 
     taulos = np.linspace(0, 0.1)
     tauhis = 0.06 - taulos
@@ -1177,286 +644,15 @@ def fig3_taus(zre=7, xe=0.05, lmin=2, lmax=100, ntests=2):
     fig.axes[1].set_xlim(0, 0.025+0.007*2)
     fig.axes[2].set_ylim(0, 0.025+0.007*2)
 
-    '''
-    lines = fig.axes[1].get_lines()
-    swap(lines)
-    fig.axes[1].set_xlim(fig.axes[0].get_ylim())
-    fig.axes[1].set_ylim(0, 0.035+0.02)
-    fig.axes[1].spines['bottom'].set_visible(False)
-    fig.axes[1].spines['left'].set_visible(True)
-
-    fig.axes[1].set_yticks([0, 0.01, 0.02, 0.03])
-    fig.axes[1].yaxis.set_ticklabels([])
-    fig.axes[1].set_xticks([])
-    fig.axes[1].set_xlabel('')
-
-
-    yticks = fig.axes[2].yaxis.get_major_ticks()
-    yticks[0].tick1line.set_visible(False)
-    '''
-
     plt.savefig('f3_taus.pdf', bbox_inches='tight')
     plt.savefig('f3_taus.png', bbox_inches='tight')
     plt.close('all')
     return
 
-def fig3_taus_forcezsplit(zre=8, xe=0.05, lmin=2, lmax=100, ntests=2):
-    '''
-    Contour plots
-    '''
-    F = []
-    wps = np.array([10, 20, 50, 100, 200, 500, 1000])
-    #wps = np.array([1e3, 5e3, 1e4, 5e4])
-    #wps = np.array([0, np.inf])
-    # 70 uK-arcmin corresponds to the projected white noise level and the
-    # reported one for 143 GHz, both in the blue book and in the final results.
-    # But 100 is a bit closer to the red  noise sensitivity...
-    wps = np.array([0, 10, 70])
-    wps = np.array([0, 10, 100, 200])
-    wps = np.array([0, 10, 60, 100])
-    #wps = np.array([0, 10, 50, 200])
-    plt.figure()
-    ell = np.arange(lmin, lmax+1)
-    fig, axes = plt.subplots(3,1)
-    fig2, axes2 = plt.subplots(3,1)
-    fig3, axes3 = plt.subplots(3,1)
-    for wp in wps:
-        F_ell, taulo, tauhi  = get_F_ell_forcezsplit(zre, xe,\
-            N_lT=(0*np.pi/180/60)**2,\
-            N_lE=(wp*np.pi/180/60)**2, lmin=lmin, lmax=lmax,
-            tau_vars=True)
-        F_ell = np.array(F_ell)
-        F.append(np.sum(F_ell,axis=0))
-
-
-    mean = np.array([0.06, 0.01])
-    mean = np.array([0.057202082194763124, 0.013024054184239887])
-    print(mean)
-    mean = np.array([taulo, tauhi])
-    print(mean)
-    gausses = []
-    for i in range(len(F)):
-        print(F[i], i, wps[i])
-        cov = np.linalg.inv(F[i])
-        print(cov[0,0]**0.5, cov[1,1]**0.5, cov[0,1])
-        gauss = GaussianND(mean, cov, labels=[r'$\tau_\mathrm{lo}$', r'$\tau_\mathrm{hi}$'],\
-            label=r'${0}\,\mathrm{{\mu K\,arcmin}}$'.format(wps[i]))
-        gausses.append(gauss)
-
-
-    g = plots.getSubplotPlotter()
-    colors = [r'C{0}'.format(i) for i in range(len(F))]
-    g.triangle_plot(gausses[::-1], filled=True, colors=colors[::-1],
-            contour_colors=colors[::-1], contour_lws=[1]*len(gausses))
-
-
-    fig = plt.gcf()
-    for ax in fig.axes[:2]:
-        ax.spines['right'].set_visible(False)
-        ax.spines['top'].set_visible(False)
-        ax.spines['left'].set_visible(False)
-        ax.set_yticks([])
-
-    taulos = np.linspace(0, 0.1)
-    tauhis = (taulo+tauhi) - taulos
-    cent = taulo+tauhi
-    fig.axes[2].plot(taulos, cent+0.02-taulos, 'k', lw=1, dashes=[5,2]) 
-    fig.axes[2].plot(taulos, cent+0.01-taulos, 'k', lw=1, dashes=[4,2]) 
-    fig.axes[2].plot(taulos, cent+0.00-taulos, 'k', lw=1, dashes=[3,2]) 
-    fig.axes[2].plot(taulos, cent-0.01-taulos, 'k', lw=1, dashes=[2,2]) 
-    fig.axes[2].plot(taulos, cent-0.02-taulos, 'k', lw=1, dashes=[1,2]) 
-
-    
-    #fig.axes[0].set_xlim(0.038-0.007, 0.073+0.007)
-    #fig.axes[2].set_xlim(0.038-0.007, 0.073+0.007)
-    
-    fig.axes[1].set_xlim(0, 0.02)
-    fig.axes[2].set_ylim(0, 0.02)
-
-    fig.axes[2].set_yticks([0, 0.01, 0.02])
-    fig.axes[1].set_xticks(   [0.01, 0.02])
-
-    plt.savefig('f3_taus_forcezsplit.pdf', bbox_inches='tight')
-    plt.savefig('f3_taus_forcezsplit.png', bbox_inches='tight')
-    plt.close('all')
-    return
-
-
-
-
-def fig3_alt(zre=8, xe=0.05, lmin=2, lmax=100, ntests=2):
-    '''
-    Contour plots with and without temperature
-    '''
-    F = []
-    FEs = []
-    wps = np.array([10, 20, 50, 100, 200, 500, 1000])
-    #wps = np.array([1e3, 5e3, 1e4, 5e4])
-    #wps = np.array([0, np.inf])
-    wps = np.array([0, np.inf])
-    wplabs = np.array(['Noiseless Measurement of T', 
-        'Infinitely Noisy T'])
-    plt.figure()
-    ell = np.arange(lmin, lmax+1)
-    fig, axes = plt.subplots(3,1)
-    fig2, axes2 = plt.subplots(3,1)
-    fig3, axes3 = plt.subplots(3,1)
-    for wp in wps:
-        F_ell, F_ellEE, dTTdx, dEEdx, dTEdx, dTTdz, dEEdz, dTEdz = get_F_ell(zre, xe,\
-            N_lT=(wp*np.pi/180/60)**2,\
-            N_lE=(0*np.pi/180/60)**2, lmin=lmin, lmax=lmax,
-            test2=True, dzre=5e-5, dxre=1e-5)
-        F_ell = np.array(F_ell)
-        F.append(np.sum(F_ell,axis=0))
-        FEs.append(np.sum(F_ellEE, axis=0))
-    
-
-    mean = np.array([zre, xe])
-    gausses = []
-    for i in range(len(F)):
-        print(F[i], i)
-        cov = np.linalg.inv(F[i])
-        gauss = GaussianND(mean, cov, labels=[r'$z_\mathrm{re}$', r'$x_e^\mathrm{min}$'],\
-            label=wplabs[i])
-        gausses.append(gauss)
-
-    g = plots.getSubplotPlotter()
-    #print(colors, type(colors))
-    #colors = tuple(colors)
-    colors = [r'C{0}'.format(i) for i in range(len(F))]
-    g.triangle_plot(gausses[::-1], filled=True, colors=colors[::-1],
-            contour_colors=colors[::-1], contour_lws=[1]*len(gausses))
-
-
-    fig = plt.gcf()
-    for ax in fig.axes[:2]:
-        ax.spines['right'].set_visible(False)
-        ax.spines['top'].set_visible(False)
-        ax.spines['left'].set_visible(False)
-        ax.set_yticks([])
-
-    #fig.axes[0].set_xlim(5., 11)
-    #fig.axes[2].set_xlim(5., 11)
-    #
-    #fig.axes[1].set_xlim(0, 0.15)
-    #fig.axes[2].set_ylim(0, 0.15)
-    #
-    ##fig.axes[2].set_yticks([0.02, 0.04])
-    ##fig.axes[2].set_xticks([0.06, 0.08])
-
-    #fig.axes[1].set_xticks([0.05, 0.10])
-    #fig.axes[2].set_yticks([0.05, 0.10])
-
-
-    plt.savefig('f3_alt.pdf', bbox_inches='tight')
-    plt.savefig('f3_alt.png', bbox_inches='tight')
-    plt.close('all')
-
-    gausses = []
-    for i in range(len(FEs)-1):
-        print(FEs[i], i)
-        cov = np.linalg.inv(FEs[i])
-        gauss = GaussianND(mean, cov, labels=[r'$z_\mathrm{re}$', r'$x_e^\mathrm{min}$'],\
-            label='EE Constraint Only')
-        gausses.append(gauss)
-
-    g = plots.getSubplotPlotter()
-    #print(colors, type(colors))
-    #colors = tuple(colors)
-    colors = [r'C3']
-    g.triangle_plot(gausses[-1], filled=True, colors=colors[-1],
-            contour_colors=colors[-1], contour_lws=[1]*len(gausses))
-
-
-    fig = plt.gcf()
-    for ax in fig.axes[:2]:
-        ax.spines['right'].set_visible(False)
-        ax.spines['top'].set_visible(False)
-        ax.spines['left'].set_visible(False)
-        ax.set_yticks([])
-
-    plt.suptitle('EE Constraints Only')
-
-    plt.savefig('f3_altEE.pdf', bbox_inches='tight')
-    plt.savefig('f3_altEE.png', bbox_inches='tight')
-    plt.close('all')
-
-    return
-
-def best_case_versus_worst(zre=8, xe=0.05, lmin=2, lmax=100, ntests=2):
-    '''
-    Trying to make a plot of sigma_tau as a function of noise, for the Wishart,
-    EE-only, and TE-only cases.
-    '''
-    wps = np.logspace(np.log10(0.65), np.log10(230), 50)
-    F = []
-    sigma_tautot = []
-    for wp in wps:
-        F_ell  = get_F_ell_tau(0.06,\
-            N_lT=(0*np.pi/180/60)**2,\
-            N_lE=(wp*np.pi/180/60)**2, lmin=lmin, lmax=lmax,
-            tau_vars=True)
-        F_ell = np.array(F_ell)
-        F.append(np.sum(F_ell,axis=0))
-    for i in range(len(F)):
-        sigma_tautot.append(1/F[i]**0.5)
-    plt.plot(wps, sigma_tautot, label=r'$\sigma_{\tau}$ from $\hat C_\ell^\mathrm{TT}+\hat C_\ell^\mathrm{TE}+\hat C_\ell^\mathrm{EE}$')
-
-    F = []
-    sigma_tautot = []
-    for wp in wps:
-        F_ell  = get_F_ell_tau(0.06,\
-            N_lT=(10000*np.pi/180/60)**2,\
-            N_lE=(wp*np.pi/180/60)**2, lmin=lmin, lmax=lmax,
-            tau_vars=True)
-        F_ell = np.array(F_ell)
-        F.append(np.sum(F_ell,axis=0))
-    for i in range(len(F)):
-        #cov = np.linalg.inv(F[i])
-        sigma_tautot.append(1/F[i]**0.5)
-    plt.plot(wps, sigma_tautot, label=r'$\sigma_{\tau}$ from $\hat C_\ell^\mathrm{EE}$')
-
-    F = []
-    sigma_tautot = []
-    for wp in wps:
-        F_ell  = get_F_ell_3_tau(0.06,\
-            N_lT=(0*np.pi/180/60)**2,\
-            N_lE=(wp*np.pi/180/60)**2, lmin=lmin, lmax=lmax,
-            tau_vars=True)
-        F_ell = np.array(F_ell)
-        F.append(np.sum(F_ell,axis=0))
-    for i in range(len(F)):
-        sigma_tautot.append(1/F[i]**0.5)
-    print(F)
-    #print(sigma_tautot)
-    plt.plot(wps, sigma_tautot, label=r'$\sigma_{\tau}$ from $\hat C_\ell^\mathrm{TE}$')
-
-    #plt.axhline(0.007, color='k', linestyle='--',
-    #        label=r'$\sigma_\tau$ from \textit{Planck} $\hat C_\ell^\mathrm{EE}$')
-    plt.xscale('log')
-    #plt.yscale('log')
-    plt.yscale('linear')
-    plt.xlim([0.65, 230])
-    plt.legend(loc='best')
-    plt.xlabel(r'$w_p^{-1/2}$ [$\mathrm{\mu K\,arcmin}$]')
-    plt.ylabel(r'$\sigma_\tau$')
-    #yticks = [0.002, 0.005, 0.01, 0.02]
-    yticks = np.arange(0.002, plt.gca().get_ylim()[1], 0.002)
-    plt.yticks(yticks, yticks)
-    ax = plt.gca()
-    ax.yaxis.set_major_formatter(FormatStrFormatter('%.3f'))
-    ax.yaxis.set_minor_locator(AutoMinorLocator(2))
-
-    plt.xticks([1,10,100],[1,10,100])
-
-
-    plt.savefig('comp_sigma_taus.pdf', bbox_inches='tight')
-    plt.savefig('comp_sigma_taus.png', bbox_inches='tight', dpi=300)
-
-
 def noise_vs_uncertainty(zre=7, xe=0.05, lmin=2, lmax=100, ntests=2):
     '''
-    Contour plots
+    Calculates and plost the Fisher uncertainty on optical depth parameters as a
+    function of white noise.
     '''
     F = []
     wps = np.logspace(np.log10(0.65), np.log10(230), 50)
@@ -1510,11 +706,7 @@ def noise_vs_uncertainty(zre=7, xe=0.05, lmin=2, lmax=100, ntests=2):
             zorder=-1)
 
 
-    #plt.axhline(0.007, color='k', linestyle='--',
-    #        label=r'\textit{Planck} $\sigma_\tau$')
-
     plt.xscale('log')
-    #plt.yscale('log')
     plt.legend(loc='best')
 
     plt.xlabel(r'$w_p^{-1/2}$ [$\mathrm{\mu K\,arcmin}$]')
@@ -1535,335 +727,7 @@ def noise_vs_uncertainty(zre=7, xe=0.05, lmin=2, lmax=100, ntests=2):
     plt.savefig('sigma_taus.pdf', bbox_inches='tight')
     plt.savefig('sigma_taus.png', bbox_inches='tight', dpi=300)
 
-    plt.figure()
-    F = []
-    for wp in wps:
-        F_ell  = get_F_ell(zre, xe,\
-            N_lT=(0*np.pi/180/60)**2,\
-            N_lE=(wp*np.pi/180/60)**2, lmin=lmin, lmax=lmax)
-        F_ell = np.array(F_ell)
-        F.append(np.sum(F_ell,axis=0))
-    
-    sigma_zre = []
-    sigma_xe = []
-    sigma_z = []
-    rhos = []
-    
-    for i in range(len(F)):
-        print(F[i], i, wps[i])
-        cov = np.linalg.inv(F[i])
-        sigma_zre.append(cov[0,0]**0.5)
-        sigma_xe.append(cov[1,1]**0.5)
-        sigma_z.append(1/F[i][0,0]**0.5)
-        rhos.append(cov[0,1])
-
-    sigma_zre = np.array(sigma_zre)
-    sigma_xe = np.array(sigma_xe)
-    rhos = np.array(rhos)
-
-    plt.plot(wps, sigma_zre/zre, 'C0-', label=r'$\sigma_{z_\mathrm{re}}/z_\mathrm{re}$')
-    plt.plot(wps, sigma_xe/xe, 'C1-', label=r'$\sigma_{x^\mathrm{min}_e}/x^\mathrm{min}_e$')
-    plt.plot(wps, (rhos/zre/xe)**0.5, '-',
-            label=r'$|\rho/(z_\mathrm{re}x^\mathrm{min}_e)|^{1/2}$',
-            color='C2')
-    plt.plot(wps, (-rhos/zre/xe)**0.5, 'C2--')
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.legend(loc='best')
-    plt.xlabel(r'$w_p^{-1/2}$ [$\mathrm{\mu K\,arcmin}$]')
-    #yticks = [0.002, 0.005, 0.01, 0.02]
-    #plt.yticks(yticks, yticks)
-
-    plt.savefig('sigma_zs.pdf', bbox_inches='tight')
-    plt.savefig('sigma_zs.png', bbox_inches='tight', dpi=300)
-    plt.close('all')
-
     return
-
-def testfig3(zre=8, xe=0.05, ntests=5):
-    '''
-    Making sure my derivatives are stable
-    '''
-    ders = []
-    wps = np.array([10, 10, 10, 10])
-    wps = np.ones(ntests)*10
-    for wp in wps:
-        ders_ell = get_F_ell(zre, xe,\
-            N_lT=(wp*np.pi/180/60)**2,\
-            N_lE=10, test=True)
-        ders.append(ders_ell)
-        print(ders[-1][0][2])
-    print('\n')
-
-    fig, axes = plt.subplots(3,1)
-    fig2, axes2 = plt.subplots(3,1)
-
-    for i in range(len(wps)):
-        dTTdx, dEEdx, dTEdx, dTTdz, dEEdz, dTEdz = ders[-1]
-        axes[0].semilogy(abs(dTTdx))
-        axes[0].set_ylabel(r'$\partial C_\ell^\mathrm{TT}/\partial x$')
-        axes[1].semilogy(abs(dTEdx))
-        axes[1].set_ylabel(r'$\partial C_\ell^\mathrm{TE}/\partial x$')
-        axes[2].semilogy(abs(dEEdx))
-        axes[2].set_ylabel(r'$\partial C_\ell^\mathrm{EE}/\partial x$')
-        axes[2].set_xlabel(r'$\ell$')
-        axes2[0].semilogy(abs(dTTdz))
-        axes2[0].set_ylabel(r'$\partial C_\ell^\mathrm{TT}/\partial z$')
-        axes2[1].semilogy(abs(dTEdz))
-        axes2[1].set_ylabel(r'$\partial C_\ell^\mathrm{TE}/\partial z$')
-        axes2[2].semilogy(abs(dEEdz))
-        axes2[2].set_ylabel(r'$\partial C_\ell^\mathrm{EE}/\partial z$')
-        axes2[2].set_xlabel(r'$\ell$')
-    fig.savefig('bla1.pdf', bbox_inches='tight')
-    fig2.savefig('bla2.pdf', bbox_inches='tight')
-    plt.close('all')
-
-    return
-
-def fig4(num=50, n_noises=30):
-    xmins = np.linspace(0, 0.08, num)
-    wps = np.logspace(0, np.log10(200), n_noises) 
-    N_lEEs = (wps*np.pi/180/60)**2
-
-    fig, axes = plt.subplots(nrows=1, ncols=2, 
-                             gridspec_kw={"width_ratios":[1,0.05], "wspace":0.1})
-    ax = axes[0]
-    cax = axes[1]
-    sm = plt.cm.ScalarMappable(cmap=plt.cm.viridis,
-            norm=mpl.colors.LogNorm(vmin=wps.min(), vmax=wps.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$w_p^{-1/2}$ [$\mathrm{\mu K\,arcmin}$]')
-
-    lnPWs = []
-    for i, N_lEE in enumerate(N_lEEs):
-        print(i)
-        ell, EE, TE, TT = get_spectra(8, 0, lmax=lmax, spectra=True, all_spectra=True)
-        Clhat = np.array([TT, EE+N_lEE, EE*0, TE, EE*0, EE*0])
-        lnPE = []
-        lnPW = []
-        for xmin in xmins:
-            lnPE.append(lnprob_EE_ell(8, xmin, Clhat[1], N_l=N_lEE))
-            lnPW.append(lnprob_wish_ell(8, xmin, Clhat, N_lT=0, N_lE=N_lEE))
-        #ax.plot(xmins, np.exp(np.sum(lnPW, axis=1)), color='C0',
-        #        alpha=1-i/len(N_lEEs))
-        ax.plot(xmins, np.exp(np.sum(lnPW, axis=1)),
-                color=plt.cm.viridis(i/len(N_lEEs)), zorder=1/N_lEE)
-        #ax.plot(xmins, np.exp(np.sum(lnPE, axis=1)), color='C1',
-        #        alpha=1-i/len(N_lEEs))
-        lnPWs.append(np.exp(np.sum(lnPW, axis=1)))
-    lnPWs = np.array(lnPWs)
-    bla = np.vstack((xmins, lnPWs))
-    np.save('xmin_lnL', bla)
-
-    ax.set_ylim([-0.05, 1.05])
-    ax.set_xlabel(r'$x_e^\mathrm{min}$')
-    ax.set_ylabel(r'$P(x_e^\mathrm{min}|z_\mathrm{re}=8,\{\hat{\boldsymbol C}_\ell\})$')
-    fig.savefig('f4.pdf', bbox_inches='tight')
-    fig.savefig('f4.png', bbox_inches='tight')
-    plt.close('all')
-
-def fig4_alt(num=50, n_noises=30):
-    xmins = np.linspace(0, 0.08, num)
-    wps = np.logspace(0, np.log10(200), n_noises) 
-    N_lEEs = (wps*np.pi/180/60)**2
-
-    fig, axes = plt.subplots(nrows=1, ncols=2, 
-                             gridspec_kw={"width_ratios":[1,0.05], "wspace":0.1})
-    ax = axes[0]
-    cax = axes[1]
-    sm = plt.cm.ScalarMappable(cmap=plt.cm.viridis,
-            norm=mpl.colors.LogNorm(vmin=wps.min(), vmax=wps.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$w_p^{-1/2}$ [$\mathrm{\mu K\,arcmin}$]')
-
-    lnPWs = []
-    for i, N_lEE in enumerate(N_lEEs):
-        print(i)
-        ell, EE, TE, TT = get_spectra(8, 0, lmax=lmax, spectra=True, all_spectra=True)
-        Clhat = np.array([TT, EE+N_lEE, EE*0, TE, EE*0, EE*0])
-        lnPE = []
-        lnPW = []
-        tau_his = []
-        for xmin in xmins:
-            lnPE.append(lnprob_EE_ell(8, xmin, Clhat[1], N_l=N_lEE))
-            lnPW.append(lnprob_wish_ell(8, xmin, Clhat, N_lT=0, N_lE=N_lEE))
-            zsplit, tau_lo, tau_hi = get_twotau(get_spectra(8, xmin, therm=True))
-            tau_his.append(tau_hi)
-        #ax.plot(xmins, np.exp(np.sum(lnPW, axis=1)), color='C0',
-        #        alpha=1-i/len(N_lEEs))
-        ax.plot(tau_his, np.exp(np.sum(lnPW, axis=1)),
-                color=plt.cm.viridis(i/len(N_lEEs)), zorder=1/N_lEE)
-        #ax.plot(xmins, np.exp(np.sum(lnPE, axis=1)), color='C1',
-        #        alpha=1-i/len(N_lEEs))
-        lnPWs.append(np.exp(np.sum(lnPW, axis=1)))
-    lnPWs = np.array(lnPWs)
-    tau_his = np.array(tau_his)
-    bla = np.vstack((tau_his, lnPWs))
-    np.save('tauhis_lnL', bla)
-    ax.set_ylim([-0.05, 1.05])
-    ax.set_xlabel(r'$\tau_\mathrm{hi}$')
-    ax.set_ylabel(r'$P(\tau_\mathrm{hi}|z_\mathrm{re}=8,\{\hat{\boldsymbol C}_\ell\})$')
-    fig.savefig('f4_alt.pdf', bbox_inches='tight')
-    fig.savefig('f4_alt.png', bbox_inches='tight')
-    plt.close('all')
-
-
-    return
-
-def fig5(num=50):
-    '''
-    Seeing what happens when EE is constant and TT gets cranked up.
-    '''
-    zres = np.linspace(7, 9, num)
-    N_lEE = 1e-6
-    N_lTTs = np.logspace(-2, 2, 5)
-    fig, ax = plt.subplots(1)
-
-    N_lTTs = [1e-6]
-
-    for i, N_lTT in enumerate(N_lTTs):
-        print(i, len(N_lTTs))
-        ell, EE, TE, TT = get_spectra(8, 0, lmax=lmax, spectra=True, all_spectra=True)
-        Clhat = np.array([TT+N_lTT, EE+N_lEE, EE*0, TE, EE*0, EE*0])
-        lnPE = []
-        lnPW = []
-        for zre in zres:
-            lnPE.append(lnprob_EE_ell(zre, 0, Clhat[1], N_l=N_lEE))
-            lnPW.append(lnprob_wish_ell(zre, 0, Clhat, N_lT=N_lTT, N_lE=N_lEE))
-        L1 = np.exp(np.sum(lnPW, axis=1))
-        ax.plot(zres, L1, color='C0',
-                alpha=1-i/len(N_lTTs))
-        L2 = np.exp(np.sum(lnPE, axis=1))
-        ax.plot(zres, L2, color='C1',
-                alpha=1-i/len(N_lTTs))
-    ax.set_ylim([-0.05, 1.05])
-    ax.plot([],[],color='C0',linestyle='-',label='Wishart Distribution')
-    ax.plot([],[],color='C1',linestyle='-',label=r'$\chi^2$ Distribution')
-    ax.set_xlabel(r'$z_\mathrm{re}$')
-    ax.set_ylabel(r'$P(z_\mathrm{re}|x_e^\mathrm{min}=0,\{\hat{\boldsymbol C}_\ell\})$')
-    legend = ax.legend(loc='best')
-
-
-    plt.figure()
-
-    mean = 8
-    sigma = 1
-    popt,pcov = curve_fit(gaus,zres,L1,p0=[1,mean,sigma])
-    s1 = popt[2]
-    plt.plot(zres, L1, label=r'$\hat C_\ell^\mathrm{TT}+\hat C_\ell^\mathrm{TE}+\hat C_\ell^\mathrm{EE}$')
-    #plt.plot(zres, gaus(zres, *popt))
-    print(popt)
-    popt,pcov = curve_fit(gaus,zres,L2,p0=[1,mean,sigma])
-    plt.plot(zres, L2, label='EE')
-    s2 = popt[2]
-    #plt.plot(zres, gaus(zres, *popt))
-    print(popt)
-    print(s1, s2)
-
-    popt = np.copy(popt)
-    s3 = np.sqrt(s2**2+s1**2)
-    popt[2] = s3
-    plt.plot(zres, gaus(zres, *popt), label=r'TT+TE')
-    plt.ylabel(r'$P(z_\mathrm{re}|x_e^\mathrm{min}=0,\{\hat{\boldsymbol C}_\ell\})$')
-    plt.xlabel(r'$z_\mathrm{re}$')
-    legend = plt.legend(loc='upper left')
-    plt.savefig('f5.pdf', bbox_inches='tight')
-    plt.savefig('f5.png', bbox_inches='tight')
-
-    print(s1, s2, s3)
-
-    plt.show()
-
-
-    return
-def fig5_alt(num=50):
-    '''
-    Seeing what happens when EE is constant and TT gets cranked up. Same as fig5
-    but with tau instead
-    '''
-    zres = np.linspace(7, 9, num)
-    N_lEE = 1e-6
-    N_lTTs = np.logspace(-2, 2, 5)
-    #fig, axes = plt.subplots(nrows=1, ncols=2, 
-    #                         gridspec_kw={"width_ratios":[1,0.05], "wspace":0.1})
-    #ax = axes[0]
-    #cax = axes[1]
-    #sm = plt.cm.ScalarMappable(cmap=plt.cm.viridis,
-    #        norm=mpl.colors.LogNorm(vmin=N_lTTs.min(), vmax=N_lTTs.max()))
-    #sm._A = []
-    #fig.colorbar(sm, cax=cax, label=r'$N_\ell^\mathrm{TT}$')
-    fig, ax = plt.subplots(1)
-
-    N_lTTs = [1e-6]
-
-    for i, N_lTT in enumerate(N_lTTs):
-        print(i, len(N_lTTs))
-        ell, EE, TE, TT = get_spectra(8, 0, lmax=lmax, spectra=True, all_spectra=True)
-        Clhat = np.array([TT+N_lTT, EE+N_lEE, EE*0, TE, EE*0, EE*0])
-        lnPE = []
-        lnPW = []
-        taus = []
-        for zre in zres:
-            lnPE.append(lnprob_EE_ell(zre, 0, Clhat[1], N_l=N_lEE))
-            lnPW.append(lnprob_wish_ell(zre, 0, Clhat, N_lT=N_lTT, N_lE=N_lEE))
-            zsplit, tau_lo, tau_hi = get_twotau(get_spectra(zre, 0, therm=True))
-            taus.append(tau_lo)
-        L1 = np.exp(np.sum(lnPW, axis=1))
-        ax.plot(taus, L1, color='C0',
-                alpha=1-i/len(N_lTTs))
-        L2 = np.exp(np.sum(lnPE, axis=1))
-        ax.plot(taus, L2, color='C1',
-                alpha=1-i/len(N_lTTs))
-    ax.set_ylim([-0.05, 1.05])
-    ax.plot([],[],color='C0',linestyle='-',label='Wishart Distribution')
-    ax.plot([],[],color='C1',linestyle='-',label=r'$\chi^2$ Distribution')
-    ax.set_xlabel(r'$\tau$')
-    ax.set_ylabel(r'$P(z_\mathrm{re}|x_e^\mathrm{min}=0,\{\hat{\boldsymbol C}_\ell\})$')
-    legend = ax.legend(loc='best')
-
-
-    fig.savefig('f5_alt.pdf', bbox_inches='tight')
-    fig.savefig('f5_alt.png', bbox_inches='tight')
-    plt.close('all')
-
-    plt.figure()
-
-    mean = 0.06
-    sigma = 0.002
-    popt,pcov = curve_fit(gaus,taus,L1,p0=[1,mean,sigma])
-    s1 = popt[2]
-    plt.plot(zres, L1, label=r'$\hat C_\ell^\mathrm{TT}+\hat C_\ell^\mathrm{TE}+\hat C_\ell^\mathrm{EE}$')
-    #plt.plot(zres, gaus(zres, *popt))
-    print(popt)
-    popt,pcov = curve_fit(gaus,taus,L2,p0=[1,mean,sigma])
-    plt.plot(taus, L2, label='EE')
-    s2 = popt[2]
-    #plt.plot(zres, gaus(zres, *popt))
-    print(popt)
-    print(s1, s2)
-
-    popt = np.copy(popt)
-    s3 = np.sqrt(s2**2+s1**2)
-    popt[2] = s3
-    popt[0] = 1.
-    print(popt)
-    print(gaus(taus, *popt))
-    plt.plot(taus, gaus(taus, popt[0], popt[1], popt[2]), label=r'TT+TE')
-    plt.ylabel(r'$P(\tau|x_e^\mathrm{min}=0,\{\hat{\boldsymbol C}_\ell\})$')
-    plt.xlabel(r'$\tau$')
-    legend = plt.legend(loc='upper left')
-    plt.savefig('f5_alt.pdf', bbox_inches='tight')
-    plt.savefig('f5_alt.png', bbox_inches='tight')
-
-    print(s1, s2, s3)
-
-    plt.show()
-
-
-    return
-
-def gaus(x,a,x0,sigma):
-    return a*np.exp(-(x-x0)**2/(2*sigma**2))
 
 def fig6(num=50, lmax=40, wp=0):
     '''
@@ -1949,228 +813,16 @@ def fig6(num=50, lmax=40, wp=0):
     fig.savefig(f'f6b_{wp}.png', bbox_inches='tight')
     plt.close()
 
-    fig, axes = plt.subplots(nrows=1, ncols=2, 
-                             gridspec_kw={"width_ratios":[1,0.05], "wspace":0.1})
-    ax = axes[0]
-    cax = axes[1]
-    sm = plt.cm.ScalarMappable(cmap=cm1,
-            norm=plt.Normalize(vmin=zs.min(), vmax=zs.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$z_\mathrm{re}$')
-
-    for i in range(num):
-        lnPE = lnprob_EE_ell(zs[i], xe0, Clhat[1], N_l=N_ell)
-        ax.plot(ell[2:], -2*lnPE[2:], color=cm1(i/num), lw=lw)
-    ax.set_xlabel(r'$\ell$')
-    ax.set_ylabel(r'$\chi^2_\mathrm{eff,\ell}$')
-    plt.title('${0}\ \mathrm{{\mu K\,arcmin}}$'.format(wp), ha='right')
-    if wp == 0: print(ax.get_ylim())
-    ax.set_ylim((0, 17.538341295423095))
-    fig.savefig(f'f6a_EE_{wp}.pdf', bbox_inches='tight')
-    fig.savefig(f'f6a_EE_{wp}.png', bbox_inches='tight')
-    plt.close()
-
-    fig, axes = plt.subplots(nrows=1, ncols=2, 
-                             gridspec_kw={"width_ratios":[1,0.05], "wspace":0.1})
-    ax = axes[0]
-    cax = axes[1]
-    sm = plt.cm.ScalarMappable(cmap=cm2,
-            norm=plt.Normalize(vmin=xes.min(), vmax=xes.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$x_e^\mathrm{min}$')
-
-    for i in range(num):
-        lnPE = lnprob_EE_ell(z0, xes[i], Clhat[1], N_l=N_ell)
-        ax.plot(ell[2:], -2*lnPE[2:], color=cm2(i/num), lw=lw)
-    ax.set_xlabel(r'$\ell$')
-    ax.set_ylabel(r'$\chi^2_\mathrm{eff,\ell}$')
-    plt.title('${0}\ \mathrm{{\mu K\,arcmin}}$'.format(wp), ha='right')
-    if wp == 0: print(ax.get_ylim())
-    ax.set_ylim((0, 11.13736343356942))
-    fig.savefig(f'f6b_EE_{wp}.pdf', bbox_inches='tight')
-    fig.savefig(f'f6b_EE_{wp}.png', bbox_inches='tight')
-    plt.close()
-
-
-    fig, axes = plt.subplots(nrows=1, ncols=2, 
-                             gridspec_kw={"width_ratios":[1,0.05], "wspace":0.1})
-    ax = axes[0]
-    cax = axes[1]
-    sm = plt.cm.ScalarMappable(cmap=cm1,
-            norm=plt.Normalize(vmin=zs.min(), vmax=zs.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$z_\mathrm{re}$')
-
-    lnPE0 = lnprob_TE_ell(z0, xe0, Clhat[3], N_lE=N_ell)
-    for i in range(num):
-        lnPE = lnprob_TE_ell(zs[i], xe0, Clhat[3], N_lE=N_ell) - lnPE0
-        ax.plot(ell[2:], -2*lnPE[2:], color=cm1(i/num), lw=lw)
-    ax.set_xlabel(r'$\ell$')
-    ax.set_ylabel(r'$\chi^2_\mathrm{eff,\ell}$')
-    plt.title('${0}\ \mathrm{{\mu K\,arcmin}}$'.format(wp), ha='right')
-    if wp == 0: print(ax.get_ylim())
-    ax.set_ylim((0, 2.7800844991679634))
-    fig.savefig(f'f6a_TE_{wp}.pdf', bbox_inches='tight')
-    fig.savefig(f'f6a_TE_{wp}.png', bbox_inches='tight')
-    plt.close()
-
-    fig, axes = plt.subplots(nrows=1, ncols=2, 
-                             gridspec_kw={"width_ratios":[1,0.05], "wspace":0.1})
-    ax = axes[0]
-    cax = axes[1]
-    sm = plt.cm.ScalarMappable(cmap=cm2,
-            norm=plt.Normalize(vmin=xes.min(), vmax=xes.max()))
-    sm._A = []
-    fig.colorbar(sm, cax=cax, label=r'$x_e^\mathrm{min}$')
-
-    for i in range(num):
-        lnPE = lnprob_TE_ell(z0, xes[i], Clhat[3], N_lE=N_ell) - lnPE0
-        ax.plot(ell[2:], -2*lnPE[2:], color=cm2(i/num), lw=lw)
-    ax.set_xlabel(r'$\ell$')
-    ax.set_ylabel(r'$\chi^2_\mathrm{eff,\ell}$')
-    plt.title('${0}\ \mathrm{{\mu K\,arcmin}}$'.format(wp), ha='right')
-    if wp == 0: print(ax.get_ylim())
-    ax.set_ylim((0, 1.7899325064530514))
-    fig.savefig(f'f6b_TE_{wp}.pdf', bbox_inches='tight')
-    fig.savefig(f'f6b_TE_{wp}.png', bbox_inches='tight')
-    plt.close()
     return
 
-
-def dertest(zre=8, x_e=0.05, dzre=5e-5, dxre=1e-5, lmin=2, lmax=100):
-    for i in range(10):
-        ell, EE, TE, TT = get_spectra(zre, x_e, lmax=lmax, spectra=True, all_spectra=True)
-        ell, dEEx, dTEx, dTTx = get_spectra(zre, x_e+dxre, lmax=lmax, spectra=True, all_spectra=True)
-        ell, dEEz, dTEz, dTTz = get_spectra(zre+dzre, x_e, lmax=lmax, spectra=True, all_spectra=True)
-        dEEdz = (dEEz - EE)/dzre
-        dTEdz = (dTEz - TE)/dzre
-        dTTdz = (dTTz - TT)/dzre
-        dEEdx = (dEEx - EE)/dxre
-        dTEdx = (dTEx - TE)/dxre
-        dTTdx = (dTTx - TT)/dxre
-        plt.figure(1)
-        plt.subplot(311)
-        plt.semilogy(ell[2:], abs(dTTdx[2:]))
-        plt.ylabel(r'$\partial C_\ell^\mathrm{TT}/\partial x$')
-        print(f'Dertest {i+0}')
-        print('dTdx')
-        print(min(abs(dTTdx[2:])))
-        print(max(abs(dTTdx[2:])))
-        print('dTdz')
-        print(min(abs(dTTdz[2:])))
-        print(max(abs(dTTdz[2:])))
-        print('\n')
-        plt.subplot(312)
-        plt.semilogy(ell[2:], abs(dTEdx[2:]))
-        plt.ylabel(r'$\partial C_\ell^\mathrm{TE}/\partial x$')
-        plt.subplot(313)
-        plt.semilogy(ell[2:], abs(dEEdx[2:]))
-        plt.ylabel(r'$\partial C_\ell^\mathrm{EE}/\partial x$')
-        plt.xlabel(r'$\ell$')
-
-        plt.figure(2)
-        plt.subplot(311)
-        plt.semilogy(ell[2:], abs(dTTdz[2:]))
-        plt.ylabel(r'$\partial C_\ell^\mathrm{TT}/\partial z$')
-        plt.subplot(312)
-        plt.semilogy(ell[2:], abs(dTEdz[2:]))
-        plt.ylabel(r'$\partial C_\ell^\mathrm{TE}/\partial z$')
-        plt.subplot(313)
-        plt.semilogy(ell[2:], abs(dEEdz[2:]))
-        plt.ylabel(r'$\partial C_\ell^\mathrm{EE}/\partial z$')
-        plt.xlabel(r'$\ell$')
-    plt.figure(1)
-    plt.savefig('dertest1.pdf', bbox_inches='tight')
-    plt.figure(2)
-    plt.savefig('dertest2.pdf', bbox_inches='tight')
-    plt.close('all')
-
-def test_sigma():
-    zre = 7.5
-    xe = 0.001
-    lmin = 2
-    lmax = 23
-    F_ell  = get_F_ell(zre, xe,\
-        N_lT=(0*np.pi/180/60)**2,\
-        N_lE=(0*np.pi/180/60)**2, lmin=lmin, lmax=lmax,
-        tau_vars=True)
-    F = np.sum(F_ell, axis=0)
-    print('TT+TE+EE', np.round(1/F[0,0]**0.5, 4))
-
-    F_ell  = get_F_ell_2(zre, xe,\
-        N_lT=(0*np.pi/180/60)**2,\
-        N_lE=(0*np.pi/180/60)**2, lmin=lmin, lmax=lmax,
-        tau_vars=True)
-    F = np.sum(F_ell, axis=0)
-    print('TT+EE   ', np.round(1/F[0,0]**0.5, 4))
-
-    F_ell  = get_F_ell(zre, xe,\
-        N_lT=(100000*np.pi/180/60)**2,\
-        N_lE=(0*np.pi/180/60)**2, lmin=lmin, lmax=lmax,
-        tau_vars=True)
-    F = np.sum(F_ell, axis=0)
-    print('EE      ', np.round(1/F[0,0]**0.5, 4))
-
-    F_ell  = get_F_ell_2(zre, xe,\
-        N_lT=(0*np.pi/180/60)**2,\
-        N_lE=(10000*np.pi/180/60)**2, lmin=lmin, lmax=lmax,
-        tau_vars=True)
-    F = np.sum(F_ell, axis=0)
-    print('TT      ', np.round(1/F[0,0]**0.5, 4))
-
-    F_ell  = get_F_ell_3(zre, xe,\
-        N_lT=(0*np.pi/180/60)**2,\
-        N_lE=(0*np.pi/180/60)**2, lmin=lmin, lmax=lmax,
-        tau_vars=True)
-    F = np.sum(F_ell, axis=0)
-    print('TE      ', np.round(1/F[0,0]**0.5, 4))
-
-    F_ell  = get_F_ell_4(zre, xe,\
-        N_lT=(0*np.pi/180/60)**2,\
-        N_lE=(0*np.pi/180/60)**2, lmin=lmin, lmax=lmax,
-        tau_vars=True)
-    F = np.sum(F_ell, axis=0)
-    print('TT+TE   ', np.round(1/F[0,0]**0.5, 4))
-
-    F_ell  = get_F_ell_5(zre, xe,\
-        N_lT=(0*np.pi/180/60)**2,\
-        N_lE=(0*np.pi/180/60)**2, lmin=lmin, lmax=lmax,
-        tau_vars=True)
-    F = np.sum(F_ell, axis=0)
-    print('TE+EE   ', np.round(1/F[0,0]**0.5, 4))
-
-
-    return
-
-def TT_constraint():
-    lmax = 100
-    ell = np.arange(lmax+1)
-    tau = 0.05
-    dtau = 0.01
-    TT = get_TT(tau=tau, rescale=True)
-    TT_delta = get_TT(tau=tau+dtau, rescale=True)
-    der = (TT_delta + TT)/dtau
-    F_ell = (2*ell+1)/2*(der/TT)**2
-    plt.loglog(ell[2:], F_ell[2:])
-    plt.xlabel(r'$\ell$')
-    plt.ylabel(r'$F_{\tau\tau,\ell}^\mathrm{TT}$')
-    
-    plt.close('all')
-    plt.loglog(ell[2:], TT[2:])
-    plt.loglog(ell[2:], TT_delta[2:])
-    plt.loglog(ell[2:], der[2:])
-    plt.loglog(ell[2:], (der/TT)[2:]**2)
-    plt.savefig('TT_fish.png', bbox_inches='tight')
-    plt.savefig('TT_fish.pdf', bbox_inches='tight')
-    ivar = sum(F_ell[2:])
-    sigma_tau = 1/ivar**2
-    print(sigma_tau)
-    plt.show()
-    return
 
 
 def fig5(n_theta, n_real, tau=0.06, lmin=2, lmax=100,
          wp=0):
+    '''
+    Displays the probability distribution for tau given TE power spectra, EE
+    power spectra, and TT+TE+EE power spectra.
+    '''
     taus = np.linspace(0.02,0.0925, n_theta)
 
     N_l = (wp*np.pi/180/60)**2
@@ -2242,7 +894,6 @@ def fig5(n_theta, n_real, tau=0.06, lmin=2, lmax=100,
             ax3.plot(taus, np.exp(lnL_arr_wish[-1]), color='k', alpha=a)
 
 
-    plt.savefig('test2.pdf', bbox_inches='tight')
     plt.close('all')
     L1 = np.exp(np.nanmean(lnL_arr_TE, axis=0))
     L2 = np.exp(np.nanmean(lnL_arr_EE, axis=0))
@@ -2289,37 +940,16 @@ if __name__ == '__main__':
     zre, xe = 6.75, 0.05
     n_theta = 2**7
     nnoise = 30
-    fig1_transp(num=n_theta)
-    #fig2(num=n_theta, n_noises=nnoise)
-    #fig2_alt(num=n_theta, n_noises=nnoise)
-    #fig3_rednoise(zre=7.2, xe=0.03, lmin=2, lmax=29)
-    #for n in np.arange(0, 200, 30):
-    #    fig3_ell_var(noise=n)
-    #fig3_ell_var(zre=7, noise=0)
-    #   fig3_alt(lmin=2, ntests=0)
-    #fig3(zre=zre, lmin=2, lmax=100, ntests=0)
-    #fig3(zre=7, xe=0.001, lmin=2, lmax=100, ntests=0)
-    #fig3_taus(zre=zre)
-    #fig3_taus_forcezsplit(xe=0.02)
-    #noise_vs_uncertainty(zre=zre, xe=0.05)
-    #   fig4(num=n_theta, n_noises=nnoise)
-    #   fig4_alt(num=n_theta, n_noises=nnoise)
-    #fig5(num=n_theta)
-    #fig5_alt(num=n_theta)
+    #fig1_transp(num=n_theta)
 
-    for wp in np.arange(0, 201, 10):
-        fig3_ell_var(noise=wp)
-        fig6(num=n_theta*2-1, wp=wp)
+    noise_vs_uncertainty(zre=zre, xe=0.05)
     fig3_ell_var(zre=zre, noise=0)
     fig6(num=n_theta*2-1, wp=0)
-
     cartoons()
+
     n_realizations = 50000
     n_theta = 251
-
     fig5(n_theta, n_realizations)
-    n_realizations = 5000
-    n_theta = 251
 
     print('2,9')
     fig3(zre=zre, lmin=2, lmax=9, ntests=0)
@@ -2332,13 +962,13 @@ if __name__ == '__main__':
     print('2,99')
     fig3(zre=zre, lmin=2, lmax=99, ntests=0)
 
-    #print('2,9')
-    #fig3_taus(zre=zre, lmin=2, lmax=9, ntests=0)
-    #print('10,19')
-    #fig3_taus(zre=zre, lmin=10, lmax=19, ntests=0)
-    #print('20,29')
-    #fig3_taus(zre=zre, lmin=20, lmax=29, ntests=0)
-    #print('30,99')
-    #fig3_taus(zre=zre, lmin=30, lmax=99, ntests=0)
-    #print('2,99')
-    #fig3_taus(zre=zre, lmin=2, lmax=99, ntests=0)
+    print('2,9')
+    fig3_taus(zre=zre, lmin=2, lmax=9, ntests=0)
+    print('10,19')
+    fig3_taus(zre=zre, lmin=10, lmax=19, ntests=0)
+    print('20,29')
+    fig3_taus(zre=zre, lmin=20, lmax=29, ntests=0)
+    print('30,99')
+    fig3_taus(zre=zre, lmin=30, lmax=99, ntests=0)
+    print('2,99')
+    fig3_taus(zre=zre, lmin=2, lmax=99, ntests=0)
